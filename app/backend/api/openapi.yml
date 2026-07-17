@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info:
+  title: Orz People Platform API
+  description: HTTP API for the Orz People Platform.
+  version: 0.1.0
+servers:
+  - url: http://localhost:3000
+    description: Local development
+tags:
+  - name: System
+    description: Service-level operations
+paths:
+  /health:
+    get:
+      tags:
+        - System
+      summary: Check service health
+      operationId: getHealth
+      responses:
+        '200':
+          description: The service is available.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - data
+        - timestamp
+      properties:
+        data:
+          type: object
+          required:
+            - service
+            - status
+          properties:
+            service:
+              type: string
+              example: orz-people-platform-backend
+            status:
+              type: string
+              example: ok
+        timestamp:
+          type: string
+          format: date-time

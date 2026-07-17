@@ -1,0 +1,12 @@
+node_modules/
+.pnpm-store/
+dist/
+.output/
+.nuxt/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+.eslintcache

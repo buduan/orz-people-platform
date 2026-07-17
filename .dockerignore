@@ -1,0 +1,8 @@
+node_modules
+.git
+.nuxt
+.output
+dist
+coverage
+.env
+.env.*

@@ -1,0 +1,17 @@
+{
+  "name": "@orz-people-platform/utils",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "pnpm --filter @orz-people-platform/types build && tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@orz-people-platform/types": "workspace:*"
+  }
+}

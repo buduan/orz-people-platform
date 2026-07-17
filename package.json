@@ -1,0 +1,41 @@
+{
+  "name": "orz-people-platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 run build",
+    "dev": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm -r --parallel --filter './app/*' run dev",
+    "dev:backend": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm --filter @orz-people-platform/backend dev",
+    "dev:frontend": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm --filter @orz-people-platform/frontend dev",
+    "lint": "eslint .",
+    "lint:changed": "eslint --cache --cache-location .eslintcache .",
+    "lint:incremental": "pnpm lint:changed",
+    "preview:frontend": "pnpm --filter @orz-people-platform/frontend preview",
+    "start": "docker compose -f compose.yml up --build",
+    "start:db": "docker compose -f compose.dev.yml up -d",
+    "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^2.1.0",
+    "@eslint/js": "^8.57.1",
+    "@types/node": "^22.18.12",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-airbnb-typescript": "^18.0.0",
+    "eslint-import-resolver-typescript": "^4.3.5",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-vue": "^10.6.0",
+    "globals": "^15.15.0",
+    "typescript": "^5.9.3",
+    "vue-eslint-parser": "^10.2.0",
+    "vue-tsc": "^3.1.4",
+    "yaml": "^2.9.0"
+  }
+}

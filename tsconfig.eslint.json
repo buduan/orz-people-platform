@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@orz-people-platform/types": [
+        "packages/types/src"
+      ],
+      "@orz-people-platform/utils": [
+        "packages/utils/src"
+      ]
+    }
+  },
+  "include": [
+    "app/backend/src/**/*.ts",
+    "app/frontend/**/*.ts",
+    "app/frontend/**/*.vue",
+    "packages/**/*.ts"
+  ]
+}
