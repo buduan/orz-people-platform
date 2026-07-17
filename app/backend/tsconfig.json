@@ -3,6 +3,11 @@
   "compilerOptions": {
     "outDir": "dist",
     "baseUrl": "./",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "incremental": true,
