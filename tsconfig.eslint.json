@@ -3,7 +3,6 @@
   "compilerOptions": {
     "allowJs": false,
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
       "@orz-people-platform/types": [
         "packages/types/src"
