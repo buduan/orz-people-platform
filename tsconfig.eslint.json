@@ -4,9 +4,6 @@
     "allowJs": false,
     "noEmit": true,
     "paths": {
-      "@orz-people-platform/types": [
-        "packages/types/src"
-      ],
       "@orz-people-platform/utils": [
         "packages/utils/src"
       ]

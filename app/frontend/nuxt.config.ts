@@ -9,9 +9,6 @@ loadEnvironment({
 export default defineNuxtConfig({
   alias: {
     '@': fileURLToPath(new URL('./', import.meta.url)),
-    '@orz-people-platform/types': fileURLToPath(
-      new URL('../../packages/types/src/', import.meta.url),
-    ),
     '@orz-people-platform/utils': fileURLToPath(
       new URL('../../packages/utils/src/', import.meta.url),
     ),
