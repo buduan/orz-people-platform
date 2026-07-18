@@ -8,8 +8,265 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Better Auth core identity models. Field names follow Better Auth's expected
+// schema so the Prisma adapter can read and write them without custom mapping.
+// App-level authorization does NOT read `User.role`; the admin plugin owns it
+// for ban/session tooling only. Business permissions live in WorkspacePermissionGrant.
+
 model User {
-  id        String   @id @default(cuid())
+  id            String  @id @default(cuid())
+  name          String  @default("")
+  email         String  @unique
+  emailVerified Boolean @default(false)
+  image         String?
+
+  // Better Auth admin plugin fields.
+  role       String?
+  banned     Boolean?  @default(false)
+  banReason  String?
+  banExpires DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  sessions            Session[]
+  accounts            Account[]
+  passkeys            Passkey[]
+  workspaceUsers      WorkspaceUser[]
+  userGroupMembership UserGroupMembership[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+
+  // Better Auth admin plugin field for impersonation tracking.
+  impersonatedBy String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Passkey {
+  id           String    @id @default(cuid())
+  name         String?
+  publicKey    String
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  aaguid       String?
+  createdAt    DateTime? @default(now())
+
+  @@index([userId])
+  @@map("passkey")
+}
+
+// ---------------------------------------------------------------------------
+// Workspace and access control
+//
+// Every business aggregate carries a non-null workspaceId so a future move to
+// multiple workspaces does not require a destructive migration. First release
+// runs a single default workspace resolved server-side; clients never assert a
+// workspace id. Authorization derives from WorkspacePermissionGrant + FormGrant
+// only; user groups and member projection never grant permissions.
+// ---------------------------------------------------------------------------
+
+model Workspace {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Member-status source configuration. The workspace designates one people
+  // form and one internal select field whose stable option codes map to
+  // "is member". Values are generic here; concrete field id / codes are set
+  // per workspace (see task 1.1) rather than hardcoded.
+  memberSourceFormId    String?
+  memberSourceFieldId   String?
+  memberOptionCodes     String[] @default([])
+  memberProjectionEpoch Int      @default(0)
+
+  workspaceUsers       WorkspaceUser[]
+  userGroups           UserGroupDefinition[]
+  permissionGrants     WorkspacePermissionGrant[]
+  formGrants           FormGrant[]
+
+  @@map("workspace")
+}
+
+model WorkspaceUser {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Technical projection maintained from the designated member-status field.
+  // Not client-assertable; updated transactionally or via reliable events.
+  isMember         Boolean  @default(false)
+  disabled         Boolean  @default(false)
+  // Bumped whenever grants or membership change so cached ActorContext
+  // authorization is invalidated on the next request.
+  permissionVersion Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  permissionGrants WorkspacePermissionGrant[]
+  formGrants       FormGrant[]
+  groupMemberships UserGroupMembership[]
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([workspaceId, isMember])
+  @@map("workspace_user")
+}
+
+// System-recognized permission catalog. The tag input in admin UI only accepts
+// keys present here; unknown strings never authorize.
+model PermissionDefinition {
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  description String   @default("")
+  scope       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@map("permission_definition")
+}
+
+model WorkspacePermissionGrant {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceUserId String
+  workspaceUser   WorkspaceUser @relation(fields: [workspaceUserId], references: [id], onDelete: Cascade)
+  permissionKey   String
+  grantedByUserId String?
+  createdAt       DateTime  @default(now())
+
+  @@unique([workspaceId, workspaceUserId, permissionKey])
+  @@index([workspaceId])
+  @@index([workspaceUserId])
+  @@map("workspace_permission_grant")
+}
+
+// Per-form role grant (owner/editor/reviewer/viewer) so scoped reviewers do not
+// need workspace-wide permissions. FK to the future Form model is added when the
+// forms aggregate lands; the formId column is scoped by workspaceId today.
+model FormGrant {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceUserId String
+  workspaceUser   WorkspaceUser @relation(fields: [workspaceUserId], references: [id], onDelete: Cascade)
+  formId          String
+  role            FormGrantRole
+  grantedByUserId String?
+  createdAt       DateTime  @default(now())
+
+  @@unique([workspaceId, formId, workspaceUserId, role])
+  @@index([workspaceId, formId])
+  @@index([workspaceUserId])
+  @@map("form_grant")
+}
+
+enum FormGrantRole {
+  owner
+  editor
+  reviewer
+  viewer
+}
+
+// Identity-only grouping. Never read by authz, member projection, or audience
+// resolution. Stable key survives renames; used groups are archived, not deleted.
+model UserGroupDefinition {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key         String
+  name        String
+  description String    @default("")
+  color       String?
+  sortOrder   Int       @default(0)
+  archived    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  memberships UserGroupMembership[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@map("user_group_definition")
+}
+
+model UserGroupMembership {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  groupId         String
+  group           UserGroupDefinition @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  workspaceUserId String
+  workspaceUser   WorkspaceUser @relation(fields: [workspaceUserId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+
+  @@unique([groupId, workspaceUserId])
+  @@index([workspaceId])
+  @@index([workspaceUserId])
+  @@map("user_group_membership")
 }

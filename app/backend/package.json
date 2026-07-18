@@ -49,6 +49,7 @@
     "dotenv-cli": "^8.0.0",
     "supertest": "^7.2.2",
     "typescript": "^6.0.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "zod": "4.4.3"
   }
 }
