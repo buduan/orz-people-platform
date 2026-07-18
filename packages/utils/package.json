@@ -4,14 +4,34 @@
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browser.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "pnpm --filter @orz-people-platform/types build && tsc --noEmit -p tsconfig.json"
+    "typecheck": "pnpm --filter @orz-people-platform/types build && tsc --noEmit -p tsconfig.json",
+    "test:contract": "vitest run test/form-validation.contract.spec.ts"
   },
   "dependencies": {
-    "@orz-people-platform/types": "workspace:*"
+    "@orz-people-platform/types": "workspace:*",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
   }
 }

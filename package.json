@@ -18,6 +18,7 @@
     "preview:frontend": "pnpm --filter @orz-people-platform/frontend preview",
     "start": "docker compose -f compose.yml up --build",
     "start:db": "docker compose -f compose.dev.yml up -d",
+    "start:delivery": "docker compose -f compose.dev.yml --profile delivery up -d mailpit delivery-sink",
     "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck"
   },
   "devDependencies": {

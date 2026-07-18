@@ -10,9 +10,16 @@
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev --schema prisma/schema.prisma",
     "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema prisma/schema.prisma",
+    "test:spike": "vitest run test/spikes --exclude test/spikes/better-auth-redis.integration.spec.ts --exclude test/spikes/postgresql-jsonb-query.integration.spec.ts --exclude test/spikes/prisma-submission-transaction.integration.spec.ts --exclude test/spikes/bullmq-worker.integration.spec.ts",
+    "test:spike:bullmq": "dotenv -e ../../.env -- vitest run test/spikes/bullmq-worker.integration.spec.ts",
+    "test:spike:postgres": "dotenv -e ../../.env -- vitest run test/spikes/postgresql-jsonb-query.integration.spec.ts",
+    "test:spike:redis": "dotenv -e ../../.env -- vitest run test/spikes/better-auth-redis.integration.spec.ts",
+    "test:spike:transaction": "dotenv -e ../../.env -- vitest run test/spikes/prisma-submission-transaction.integration.spec.ts",
     "typecheck": "pnpm prisma:generate && pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && tsc --noEmit -p tsconfig.build.json"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.6.23",
+    "@better-auth/prisma-adapter": "^1.6.23",
     "@nestjs/common": "catalog:",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "catalog:",
@@ -21,6 +28,8 @@
     "@orz-people-platform/types": "workspace:*",
     "@orz-people-platform/utils": "workspace:*",
     "@prisma/client": "^6.19.0",
+    "better-auth": "^1.6.23",
+    "bullmq": "^5.80.8",
     "ioredis": "^5.6.1",
     "prisma": "^6.19.0",
     "reflect-metadata": "catalog:",
@@ -29,7 +38,11 @@
   "devDependencies": {
     "@nestjs/cli": "catalog:",
     "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "^11.1.28",
+    "@types/supertest": "^7.2.1",
     "dotenv-cli": "^8.0.0",
-    "typescript": "^6.0.0"
+    "supertest": "^7.2.2",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.10"
   }
 }

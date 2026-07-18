@@ -20,6 +20,8 @@ export default [
       '**/dist/**',
       '**/.nuxt/**',
       '**/.output/**',
+      '.agents/**',
+      '.codex/**',
       '**/node_modules/**',
       'scripts/**/*.mjs',
       'eslint.config.mjs',

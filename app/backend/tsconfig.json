@@ -10,6 +10,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "incremental": true,
+    "rootDir": "src",
     "sourceMap": true
   },
   "include": [

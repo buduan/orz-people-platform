@@ -34,6 +34,38 @@ services:
       timeout: 5s
       retries: 10
 
+  mailpit:
+    profiles: ['delivery']
+    image: axllent/mailpit:v1.30.0
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 500
+    ports:
+      - '${MAILPIT_SMTP_PORT:-1025}:1025'
+      - '${MAILPIT_UI_PORT:-8025}:8025'
+
+  delivery-sink:
+    profiles: ['delivery']
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /service
+    command: ['node', 'delivery-sink.mjs']
+    environment:
+      DELIVERY_SINK_PORT: 8080
+    ports:
+      - '${DELIVERY_SINK_PORT:-8085}:8080'
+    volumes:
+      - './scripts/delivery-sink.mjs:/service/delivery-sink.mjs:ro'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8080/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   postgres-data:
   redis-data:

@@ -11,6 +11,7 @@
   },
   "include": [
     "app/backend/src/**/*.ts",
+    "app/backend/test/**/*.ts",
     "app/frontend/**/*.ts",
     "app/frontend/**/*.vue",
     "packages/**/*.ts"
