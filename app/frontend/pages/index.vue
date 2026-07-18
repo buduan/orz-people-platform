@@ -6,13 +6,16 @@ const serviceStatus: ApiResponse<{ service: string; status: string }> = {
     service: 'orz-people-platform-frontend',
     status: 'ready',
   },
-  timestamp: new Date().toISOString(),
+  meta: {
+    requestId: 'frontend-render',
+    timestamp: new Date().toISOString(),
+  },
 };
 
 const formattedUpdatedAt = new Intl.DateTimeFormat('zh-CN', {
   dateStyle: 'medium',
   timeStyle: 'medium',
-}).format(new Date(serviceStatus.timestamp));
+}).format(new Date(serviceStatus.meta.timestamp));
 
 </script>
 

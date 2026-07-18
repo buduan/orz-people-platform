@@ -24,7 +24,12 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      APP_ORIGIN: ${APP_ORIGIN}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      MASTER_ENCRYPTION_KEY: ${MASTER_ENCRYPTION_KEY}
+      PASSKEY_ORIGIN: ${PASSKEY_ORIGIN}
+      PASSKEY_RP_ID: ${PASSKEY_RP_ID}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     ports:
       - '${BACKEND_PORT:-3000}:3000'
@@ -33,6 +38,44 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: app/backend/Dockerfile
+    restart: unless-stopped
+    command: ['node', 'dist/worker.js']
+    environment:
+      NODE_ENV: production
+      APP_ORIGIN: ${APP_ORIGIN}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      MASTER_ENCRYPTION_KEY: ${MASTER_ENCRYPTION_KEY}
+      PASSKEY_ORIGIN: ${PASSKEY_ORIGIN}
+      PASSKEY_RP_ID: ${PASSKEY_RP_ID}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      WORKER_HEALTH_PORT: 3002
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3002/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   postgres:
     image: postgres:17-alpine

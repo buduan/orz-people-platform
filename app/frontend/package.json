@@ -5,7 +5,10 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev --host 0.0.0.0",
+    "dev:test": "nuxt dev --host 127.0.0.1 --port 3301",
     "preview": "nuxt preview --host 0.0.0.0",
+    "test:component": "vitest run --config vitest.config.mts",
+    "test:e2e": "playwright test",
     "typecheck": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && nuxt typecheck"
   },
   "dependencies": {
@@ -14,6 +17,15 @@
     "@orz-people-platform/utils": "workspace:*",
     "dotenv": "^16.6.1",
     "nuxt": "catalog:",
+    "openapi-fetch": "0.17.0",
     "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@nuxt/test-utils": "4.0.3",
+    "@playwright/test": "1.61.1",
+    "@vue/test-utils": "2.4.11",
+    "happy-dom": "20.10.6",
+    "openapi-typescript": "7.13.0",
+    "vitest": "4.1.10"
   }
 }

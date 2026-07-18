@@ -1,0 +1,244 @@
+{
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "AppController_getHealth",
+        "parameters": [
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "description": "Optional caller-provided trace identifier. Invalid values are replaced.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The service is available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "service",
+                        "status"
+                      ],
+                      "properties": {
+                        "service": {
+                          "type": "string",
+                          "example": "orz-people-platform-backend"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "ok",
+                            "ready"
+                          ]
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "requestId",
+                        "timestamp"
+                      ],
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "maxLength": 128,
+                          "pattern": "^[A-Za-z0-9._:-]+$"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check service health",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "AppController_getLiveness",
+        "parameters": [
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "description": "Optional caller-provided trace identifier. Invalid values are replaced.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The HTTP process is alive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "service",
+                        "status"
+                      ],
+                      "properties": {
+                        "service": {
+                          "type": "string",
+                          "example": "orz-people-platform-backend"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "ok",
+                            "ready"
+                          ]
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "requestId",
+                        "timestamp"
+                      ],
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "maxLength": 128,
+                          "pattern": "^[A-Za-z0-9._:-]+$"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check HTTP process liveness",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "AppController_getReadiness",
+        "parameters": [
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "description": "Optional caller-provided trace identifier. Invalid values are replaced.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The HTTP process accepts requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "service",
+                        "status"
+                      ],
+                      "properties": {
+                        "service": {
+                          "type": "string",
+                          "example": "orz-people-platform-backend"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "ok",
+                            "ready"
+                          ]
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "requestId",
+                        "timestamp"
+                      ],
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "maxLength": 128,
+                          "pattern": "^[A-Za-z0-9._:-]+$"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check HTTP process readiness",
+        "tags": [
+          "System"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Orz People Platform API",
+    "description": "HTTP API for the Orz People Platform.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "schemas": {}
+  }
+}

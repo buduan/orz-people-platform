@@ -20,6 +20,7 @@ export default [
       '**/dist/**',
       '**/.nuxt/**',
       '**/.output/**',
+      '**/types/api.generated.d.ts',
       '.agents/**',
       '.codex/**',
       '**/node_modules/**',
@@ -31,7 +32,7 @@ export default [
   ...compat.extends('airbnb-base', 'airbnb-typescript/base'),
   ...vuePlugin.configs['flat/recommended'],
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.{ts,tsx,mts}'],
     languageOptions: {
       globals: globals.node,
       parser: tsParser,
@@ -78,13 +79,23 @@ export default [
     },
   },
   {
-    files: ['app/frontend/**/*.{ts,vue}'],
+    files: ['app/frontend/**/*.{ts,mts,vue}'],
     languageOptions: {
       globals: globals.browser,
     },
   },
   {
-    files: ['**/*.{ts,vue}'],
+    files: [
+      '**/*.config.{ts,mts}',
+      '**/test/**/*.{ts,tsx}',
+      '**/tests/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'import/no-extraneous-dependencies': ['error', { devDependencies: true }],
+    },
+  },
+  {
+    files: ['**/*.{ts,mts,vue}'],
     rules: {
       // Nest modules and package barrel files deliberately use named exports.
       'class-methods-use-this': 'off',

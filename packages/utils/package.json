@@ -24,7 +24,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "pnpm --filter @orz-people-platform/types build && tsc --noEmit -p tsconfig.json",
-    "test:contract": "vitest run test/form-validation.contract.spec.ts"
+    "test:contract": "vitest run test/form-validation.contract.spec.ts",
+    "test:unit": "vitest run test"
   },
   "dependencies": {
     "@orz-people-platform/types": "workspace:*",

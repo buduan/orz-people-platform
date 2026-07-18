@@ -1,16 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
-import type { ApiResponse } from '@orz-people-platform/types';
+import { HealthService, type ProcessHealth } from './health/health.service';
 
 @Injectable()
 export class AppService {
-  public getHealth(): ApiResponse<{ service: string; status: string }> {
-    return {
-      data: {
-        service: 'orz-people-platform-backend',
-        status: 'ok',
-      },
-      timestamp: new Date().toISOString(),
-    };
+  public constructor(
+    @Inject(HealthService)
+    private readonly healthService: HealthService,
+  ) {}
+
+  public getHealth(): ProcessHealth {
+    return this.healthService.liveness();
+  }
+
+  public getLiveness(): ProcessHealth {
+    return this.healthService.liveness();
+  }
+
+  public getReadiness(): ProcessHealth {
+    return this.healthService.readiness();
   }
 }

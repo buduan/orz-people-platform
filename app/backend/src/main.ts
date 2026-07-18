@@ -1,33 +1,9 @@
-import { Logger } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { bootstrapHttp } from './bootstrap/http';
+import { JsonLogger } from './observability/json-logger.service';
 
-import { AppModule } from './app.module';
+const logger = new JsonLogger();
 
-async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
-  const port = Number(process.env.PORT ?? 3000);
-
-  const openApiConfig = new DocumentBuilder()
-    .setOpenAPIVersion('3.1.0')
-    .setTitle('Orz People Platform API')
-    .setDescription('HTTP API for the Orz People Platform.')
-    .setVersion('0.1.0')
-    .build();
-  const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
-
-  SwaggerModule.setup('docs', app, openApiDocument, {
-    customSiteTitle: 'Orz People Platform API Docs',
-    jsonDocumentUrl: 'docs-json',
-    yamlDocumentUrl: 'docs-yaml',
-  });
-
-  app.enableShutdownHooks();
-  await app.listen(port);
-  Logger.log(`Backend listening on port ${port}`, 'Bootstrap');
-  Logger.log(`Swagger UI available at http://localhost:${port}/docs`, 'Bootstrap');
-}
-
-bootstrap().catch((error: unknown) => {
-  Logger.error(error, 'Bootstrap');
+bootstrapHttp().catch((error: unknown) => {
+  logger.error('HTTP process failed to start.', error);
+  process.exitCode = 1;
 });

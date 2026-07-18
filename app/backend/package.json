@@ -6,7 +6,10 @@
   "scripts": {
     "build": "pnpm run prisma:generate && nest build",
     "dev": "nest start --watch",
+    "dev:worker": "nest start --watch --entryFile worker",
+    "openapi:document": "pnpm run build && node dist/openapi/write-openapi.js",
     "start": "node dist/main.js",
+    "start:worker": "node dist/worker.js",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev --schema prisma/schema.prisma",
     "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema prisma/schema.prisma",
@@ -15,6 +18,8 @@
     "test:spike:postgres": "dotenv -e ../../.env -- vitest run test/spikes/postgresql-jsonb-query.integration.spec.ts",
     "test:spike:redis": "dotenv -e ../../.env -- vitest run test/spikes/better-auth-redis.integration.spec.ts",
     "test:spike:transaction": "dotenv -e ../../.env -- vitest run test/spikes/prisma-submission-transaction.integration.spec.ts",
+    "test:integration": "vitest run test/integration",
+    "test:unit": "vitest run test/unit",
     "typecheck": "pnpm prisma:generate && pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && tsc --noEmit -p tsconfig.build.json"
   },
   "dependencies": {
@@ -39,6 +44,7 @@
     "@nestjs/cli": "catalog:",
     "@nestjs/schematics": "catalog:",
     "@nestjs/testing": "^11.1.28",
+    "@types/express": "5.0.6",
     "@types/supertest": "^7.2.1",
     "dotenv-cli": "^8.0.0",
     "supertest": "^7.2.2",
