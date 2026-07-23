@@ -3,10 +3,10 @@ defineEmits<{ 'toggle-sidebar': [] }>();
 
 const accountMenuItems = [
   [
-    { label: 'Profile', icon: 'i-lucide-user' },
-    { label: 'Preferences', icon: 'i-lucide-sliders-horizontal' },
+    { label: 'Profile', icon: 'i-solar-user-line-duotone' },
+    { label: 'Preferences', icon: 'i-solar-tuning-line-duotone' },
   ],
-  [{ label: 'Sign out', icon: 'i-lucide-log-out' }],
+  [{ label: 'Sign out', icon: 'i-solar-logout-line-duotone' }],
 ];
 </script>
 
@@ -15,7 +15,7 @@ const accountMenuItems = [
     <div class="flex h-16 items-center justify-between px-4 sm:px-6">
       <div class="flex items-center gap-2">
         <UButton
-          icon="i-lucide-menu"
+          icon="i-solar-hamburger-menu-line-duotone"
           color="neutral"
           variant="ghost"
           class="lg:hidden"
@@ -36,7 +36,7 @@ const accountMenuItems = [
           inset
         >
           <UButton
-            icon="i-lucide-bell"
+            icon="i-solar-bell-line-duotone"
             color="neutral"
             variant="ghost"
             aria-label="Notifications"
@@ -50,7 +50,7 @@ const accountMenuItems = [
             aria-label="Account menu"
           >
             <UAvatar
-              icon="i-lucide-user"
+              icon="i-solar-user-line-duotone"
               size="md"
             />
           </button>

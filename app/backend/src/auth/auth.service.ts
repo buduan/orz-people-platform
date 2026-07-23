@@ -30,9 +30,21 @@ export class AuthService implements OnModuleInit {
   }
 
   public async onModuleInit(): Promise<void> {
+    await this.ensureInitialized();
+  }
+
+  // Idempotent so the bootstrap can build the Better Auth instance before the
+  // Express handler is mounted (mounting must happen before app.init()/listen()
+  // so the auth routes are registered ahead of Nest's not-found handler).
+  public async ensureInitialized(): Promise<Auth> {
+    if (this.authInstance) {
+      return this.authInstance;
+    }
+
     const appOrigin = this.configService.getOrThrow<string>('APP_ORIGIN');
 
     this.authInstance = await createAuth({
+      apiOrigin: this.configService.getOrThrow<string>('API_ORIGIN'),
       appOrigin,
       isProduction: this.configService.getOrThrow<string>('NODE_ENV') === 'production',
       passkeyOrigin: this.configService.getOrThrow<string>('PASSKEY_ORIGIN'),
@@ -43,5 +55,7 @@ export class AuthService implements OnModuleInit {
       sendVerificationOtp: (message) => this.otpSender.send(message),
       trustedOrigins: [appOrigin],
     });
+
+    return this.authInstance;
   }
 }

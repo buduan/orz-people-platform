@@ -18,7 +18,7 @@ import { HealthModule } from './health/health.module';
 import { ApiExceptionFilter } from './http/api-exception.filter';
 import { ApiSuccessInterceptor } from './http/api-success.interceptor';
 import { RequestContextMiddleware } from './http/request-context.middleware';
-import { JsonLogger } from './observability/json-logger.service';
+import { ObservabilityModule } from './observability/observability.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { SubmissionsModule } from './submissions/submissions.module';
@@ -34,6 +34,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
       envFilePath: [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')],
       validate: validateEnvironment,
     }),
+    ObservabilityModule,
     PrismaModule,
     RedisModule,
     HealthModule,
@@ -50,7 +51,6 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
   controllers: [AppController],
   providers: [
     AppService,
-    JsonLogger,
     RequestContextMiddleware,
     {
       provide: APP_FILTER,

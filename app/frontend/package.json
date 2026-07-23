@@ -12,15 +12,18 @@
     "typecheck": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && nuxt typecheck"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.6.23",
     "@nuxt/ui": "^3.3.7",
     "@orz-people-platform/types": "workspace:*",
     "@orz-people-platform/utils": "workspace:*",
+    "better-auth": "^1.6.23",
     "dotenv": "^16.6.1",
     "nuxt": "catalog:",
     "openapi-fetch": "0.17.0",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@iconify-json/solar": "^1.2.5",
     "@nuxt/test-utils": "4.0.3",
     "@playwright/test": "1.61.1",
     "@vue/test-utils": "2.4.11",

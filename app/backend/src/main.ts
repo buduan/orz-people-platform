@@ -5,5 +5,7 @@ const logger = new JsonLogger();
 
 bootstrapHttp().catch((error: unknown) => {
   logger.error('HTTP process failed to start.', error);
-  process.exitCode = 1;
+  // Exit explicitly: open handles (Redis, Prisma) would otherwise keep a
+  // failed process alive as a zombie under `nest start --watch`.
+  process.exit(1);
 });

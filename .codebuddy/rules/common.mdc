@@ -1,0 +1,49 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-07-21T17:51:33.627Z
+provider: 
+---
+
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+This pnpm workspace separates applications from shared libraries. `app/frontend/` contains the Nuxt 3 UI. `app/backend/` contains the NestJS API, with code in `src/` and Prisma files in `prisma/`. Do not edit generated `dist/`, `.nuxt/`, or `.output/` files.
+
+## Build, Test, and Development Commands
+
+Use Node 22+ and pnpm 10.
+
+- `cp .env.example .env && pnpm start:db`: start PostgreSQL and Redis for local development.
+- `pnpm dev`: build shared packages, then run both applications in watch mode.
+- `pnpm lint`: check TypeScript and Vue files with ESLint.
+- `pnpm typecheck`: type-check every workspace package.
+- `pnpm build`: produce all package and application builds in dependency order.
+
+## Coding Style & Naming Conventions
+
+Write strict TypeScript with two-space indentation, semicolons, single quotes, and trailing commas. Follow `eslint.config.mjs`. Use PascalCase for classes and Vue components, camelCase for variables and functions, and kebab-case for filenames. NestJS files use role suffixes such as `redis.service.ts`. Prefer Vue 3 `<script setup lang="ts">`.
+
+## Shared Types & Utilities
+
+Place types used by both applications in `packages/types/src/` and import them through `@orz-people-platform/types`. Examples include API request and response bodies, pagination and error envelopes, shared enums, identifiers, and framework-neutral domain contracts. Do not duplicate these definitions in an application.
+
+Before adding a frontend or backend helper, decide whether the other application can reuse it. Place reusable, framework-neutral functions—such as parsing, normalization, date formatting, or shared validation helpers—in `packages/utils/src/`. Keep application-specific or framework-coupled behavior inside its owning application.
+
+## Testing Guidelines
+
+No automated test runner or coverage threshold is configured. Changes must pass `pnpm lint`, `pnpm typecheck`, and `pnpm build`. Add regression coverage when available.
+
+## Agent-Specific Instructions
+
+For every implementation and design plan, follow the `ponytail` skill: verify the need, reuse existing code, prefer standard or native features, avoid speculative abstractions, and choose the smallest correct change. For frontend layout or visual design, use the `taste-design` skill when helpful; preserve responsive behavior, accessibility basics, clear hierarchy, and the existing Nuxt UI conventions.
+
+## Commit & Pull Request Guidelines
+
+History uses Conventional Commit-style subjects such as `feat: init the monorepo project`. Use `type: concise summary` and keep commits focused. Pull requests should explain the change, list verification commands, link issues, include screenshots for UI changes, and call out migrations, environment variables, or API contract changes.
+
+## Security & Configuration
+
+Never commit `.env` or real credentials. Update `.env.example` when configuration requirements change.

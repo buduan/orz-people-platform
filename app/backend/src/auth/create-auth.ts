@@ -28,6 +28,7 @@ const GLOBAL_RATE_LIMIT_WINDOW_SECONDS = 60;
 const GLOBAL_RATE_LIMIT_MAX = 100;
 
 export interface AuthDependencies {
+  apiOrigin: string;
   appOrigin: string;
   isProduction: boolean;
   passkeyOrigin: string;
@@ -56,8 +57,7 @@ export async function createAuth(dependencies: AuthDependencies): Promise<Auth> 
 
   const auth = betterAuth({
     advanced: {
-      // Same-site reverse proxy fronts /api/auth and business API in production;
-      // keep CSRF and origin checks on so cross-site requests are rejected.
+      // Keep CSRF and origin checks on for direct cross-origin API requests.
       disableCSRFCheck: false,
       disableOriginCheck: false,
       ipAddress: {
@@ -68,7 +68,7 @@ export async function createAuth(dependencies: AuthDependencies): Promise<Auth> 
       useSecureCookies: dependencies.isProduction,
     },
     appName: 'Orz People Platform',
-    baseURL: dependencies.appOrigin,
+    baseURL: dependencies.apiOrigin,
     database: prismaAdapter(dependencies.prisma, { provider: 'postgresql' }),
     emailAndPassword: {
       // Password is optional per user; accounts can exist with OTP only.

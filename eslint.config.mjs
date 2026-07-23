@@ -85,6 +85,22 @@ export default [
     },
   },
   {
+    files: ['app/frontend/**/*.js'],
+    languageOptions: {
+      globals: globals.browser,
+    },
+    rules: {
+      // Plain JS files sit outside tsconfig.eslint.json (allowJs: false);
+      // disable type-aware rules that require parserServices.
+      '@typescript-eslint/dot-notation': 'off',
+      '@typescript-eslint/no-implied-eval': 'off',
+      '@typescript-eslint/no-throw-literal': 'off',
+      '@typescript-eslint/return-await': 'off',
+      // Named exports match the convention used by ts/vue files.
+      'import/prefer-default-export': 'off',
+    },
+  },
+  {
     files: [
       '**/*.config.{ts,mts}',
       '**/test/**/*.{ts,tsx}',

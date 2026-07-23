@@ -1,8 +1,10 @@
 export type NodeEnvironment = 'development' | 'production' | 'test';
 
 export interface Environment {
+  API_ORIGIN: string;
   APP_ORIGIN: string;
   BETTER_AUTH_SECRET: string;
+  CORS_ALLOWED_ORIGINS: string[];
   DATABASE_URL: string;
   MASTER_ENCRYPTION_KEY: string;
   NODE_ENV: NodeEnvironment;
@@ -15,11 +17,31 @@ export interface Environment {
 
 const NODE_ENVIRONMENTS = new Set<NodeEnvironment>(['development', 'production', 'test']);
 
+const API_ORIGIN_FALLBACK = 'https://opp.ibuduan.com';
+
 function requiredString(environment: Record<string, unknown>, key: string): string {
   const value = environment[key];
 
   if (typeof value !== 'string' || value.trim() === '') {
     throw new Error(`${key} is required.`);
+  }
+
+  return value.trim();
+}
+
+function optionalString(
+  environment: Record<string, unknown>,
+  key: string,
+  fallback: string,
+): string {
+  const value = environment[key];
+
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error(`${key} must be a string.`);
   }
 
   return value.trim();
@@ -76,6 +98,22 @@ function encryptionKey(value: string): string {
   return value;
 }
 
+function parseCorsAllowedOrigins(raw: unknown): string[] {
+  if (raw === undefined || raw === null || raw === '') {
+    return [];
+  }
+
+  if (typeof raw !== 'string') {
+    throw new Error('CORS_ALLOWED_ORIGINS must be a comma-separated list of origin URLs.');
+  }
+
+  const origins = raw.split(',').map((item) => item.trim()).filter(Boolean);
+
+  origins.forEach((item) => origin(item, 'CORS_ALLOWED_ORIGINS'));
+
+  return origins;
+}
+
 export function validateEnvironment(environment: Record<string, unknown>): Environment {
   const rawNodeEnvironment = environment.NODE_ENV ?? 'development';
 
@@ -86,6 +124,10 @@ export function validateEnvironment(environment: Record<string, unknown>): Envir
 
   const nodeEnvironment = rawNodeEnvironment as NodeEnvironment;
   const appOrigin = origin(requiredString(environment, 'APP_ORIGIN'), 'APP_ORIGIN');
+  const apiOrigin = origin(
+    optionalString(environment, 'API_ORIGIN', API_ORIGIN_FALLBACK),
+    'API_ORIGIN',
+  );
   const passkeyOrigin = origin(
     requiredString(environment, 'PASSKEY_ORIGIN'),
     'PASSKEY_ORIGIN',
@@ -105,6 +147,12 @@ export function validateEnvironment(environment: Record<string, unknown>): Envir
     throw new Error('APP_ORIGIN must use HTTPS in production.');
   }
 
+  const localApiOrigin = ['localhost', '127.0.0.1', '::1'].includes(apiOrigin.hostname);
+
+  if (nodeEnvironment === 'production' && apiOrigin.protocol !== 'https:' && !localApiOrigin) {
+    throw new Error('API_ORIGIN must use HTTPS in production.');
+  }
+
   if (passkeyOrigin.hostname !== rpId && !passkeyOrigin.hostname.endsWith(`.${rpId}`)) {
     throw new Error('PASSKEY_RP_ID must equal or be a parent domain of PASSKEY_ORIGIN.');
   }
@@ -112,9 +160,13 @@ export function validateEnvironment(environment: Record<string, unknown>): Envir
   url(requiredString(environment, 'DATABASE_URL'), 'DATABASE_URL', ['postgres:', 'postgresql:']);
   url(requiredString(environment, 'REDIS_URL'), 'REDIS_URL', ['redis:', 'rediss:']);
 
+  const corsAllowedOrigins = parseCorsAllowedOrigins(environment.CORS_ALLOWED_ORIGINS);
+
   return {
+    API_ORIGIN: apiOrigin.origin,
     APP_ORIGIN: appOrigin.origin,
     BETTER_AUTH_SECRET: authSecret,
+    CORS_ALLOWED_ORIGINS: corsAllowedOrigins,
     DATABASE_URL: requiredString(environment, 'DATABASE_URL'),
     MASTER_ENCRYPTION_KEY: encryptionKey(requiredString(environment, 'MASTER_ENCRYPTION_KEY')),
     NODE_ENV: nodeEnvironment,

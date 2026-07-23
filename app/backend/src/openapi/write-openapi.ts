@@ -2,8 +2,10 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 const OPENAPI_ENVIRONMENT = {
+  API_ORIGIN: 'http://localhost:3000',
   APP_ORIGIN: 'http://localhost:3001',
   BETTER_AUTH_SECRET: 'openapi-only-secret-with-at-least-32-characters',
+  CORS_ALLOWED_ORIGINS: '',
   DATABASE_URL: 'postgresql://openapi:openapi@localhost:5432/openapi?schema=public',
   MASTER_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
   NODE_ENV: 'test',

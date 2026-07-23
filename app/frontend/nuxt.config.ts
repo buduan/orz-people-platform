@@ -6,6 +6,13 @@ loadEnvironment({
   quiet: true,
 });
 
+// The root .env defines PORT for the backend. Nuxt dev binds PORT as a
+// secondary listener next to NUXT_PORT, which steals the backend's port when
+// both apps start together, so it must not leak into the Nuxt process.
+delete process.env.PORT;
+
+const backendOrigin = process.env.BACKEND_ORIGIN ?? 'http://localhost:6771';
+
 export default defineNuxtConfig({
   alias: {
     '@': fileURLToPath(new URL('./', import.meta.url)),
@@ -17,8 +24,19 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   modules: ['@nuxt/ui'],
+  nitro: {
+    // Keep auth cookies on the frontend origin during local development.
+    // Production should proxy /api at the edge in the same way.
+    devProxy: {
+      '/api': {
+        target: backendOrigin,
+      },
+    },
+  },
   runtimeConfig: {
     public: {
+      // Business API requests target the backend directly. Authentication uses
+      // the same-origin /api proxy so its session cookie remains available.
       apiBase: 'http://localhost:3000',
     },
   },

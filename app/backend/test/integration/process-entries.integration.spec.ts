@@ -21,8 +21,10 @@ interface ProcessExit {
 function processEnvironment(port: number, workerHealthPort: number): NodeJS.ProcessEnv {
   return {
     ...process.env,
+    API_ORIGIN: `http://localhost:${port}`,
     APP_ORIGIN: 'http://localhost:3001',
     BETTER_AUTH_SECRET: 'integration-secret-with-at-least-32-characters',
+    CORS_ALLOWED_ORIGINS: '',
     DATABASE_URL: process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL,
     MASTER_ENCRYPTION_KEY: MASTER_KEY,
     NODE_ENV: 'test',

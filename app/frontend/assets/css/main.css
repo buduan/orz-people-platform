@@ -26,3 +26,27 @@
 @utility animate-fade-rise {
   animation: fade-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* Restrained tonal drift for the auth brand panel — quiet, single-accent, never
+   the banned neon loop. Honors reduced-motion. */
+@keyframes aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(-4%, -2%, 0) scale(1.05);
+  }
+
+  50% {
+    transform: translate3d(4%, 3%, 0) scale(1.12);
+  }
+}
+
+@utility animate-aurora {
+  animation: aurora-drift 18s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-rise,
+  .animate-aurora {
+    animation: none;
+  }
+}
