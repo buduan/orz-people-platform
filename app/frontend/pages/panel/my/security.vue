@@ -156,7 +156,7 @@ async function savePassword() {
 
 async function signOut() {
   await auth.signOut();
-  await navigateTo('/login');
+  await navigateTo('/auth/login');
 }
 </script>
 
