@@ -10,3 +10,7 @@ coverage/
 *.log
 *.tsbuildinfo
 .eslintcache
+
+# Openspec
+
+/openspec/
