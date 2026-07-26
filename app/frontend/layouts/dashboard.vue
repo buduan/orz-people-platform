@@ -7,6 +7,7 @@ import { computed, shallowRef, useState } from '#imports';
 
 const authStore = useAuthStore();
 const mobileNavigationOpen = shallowRef(false);
+const desktopSidebarCollapsed = shallowRef(false);
 const workspaceId = useState<number>('dashboard-workspace-id', () => 1);
 
 const workspaces: Pick<WorkspaceSummary, 'id' | 'name' | 'slug'>[] = [{
@@ -82,15 +83,20 @@ async function logout(): Promise<void> {
 
 <template>
   <div
-    class="min-h-[100dvh] bg-muted lg:grid
-      lg:grid-cols-[18rem_minmax(0,1fr)]"
+    class="min-h-[100dvh] bg-muted motion-safe:transition-[grid-template-columns]
+      motion-safe:duration-300 motion-safe:ease-in-out lg:grid"
+    :class="desktopSidebarCollapsed
+      ? 'lg:grid-cols-[5rem_minmax(0,1fr)]'
+      : 'lg:grid-cols-[18rem_minmax(0,1fr)]'"
   >
     <aside class="sticky top-0 hidden h-[100dvh] lg:block">
       <DashboardSidebar
+        v-model:collapsed="desktopSidebarCollapsed"
         v-model:workspace-id="workspaceId"
         :navigation="navigation"
         :workspaces="workspaces"
         :user="user"
+        collapsible
         @logout="logout"
       />
     </aside>

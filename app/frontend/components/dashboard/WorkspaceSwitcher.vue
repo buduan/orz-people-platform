@@ -7,6 +7,7 @@ type WorkspaceOption = Pick<WorkspaceSummary, 'id' | 'name' | 'slug'>;
 
 const props = defineProps<{
   workspaces: WorkspaceOption[];
+  collapsed?: boolean;
 }>();
 
 const workspaceId = defineModel<number>('workspaceId', { required: true });
@@ -14,16 +15,6 @@ const workspaceId = defineModel<number>('workspaceId', { required: true });
 const currentWorkspace = computed(() => (
   props.workspaces.find((workspace) => workspace.id === workspaceId.value)
   ?? props.workspaces[0]
-));
-
-const workspaceInitials = computed(() => (
-  currentWorkspace.value?.name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase()
-  ?? 'WS'
 ));
 
 const workspaceItems = computed<DropdownMenuItem[][]>(() => [
@@ -50,28 +41,45 @@ const workspaceItems = computed<DropdownMenuItem[][]>(() => [
     :content="{ align: 'start', side: 'bottom', sideOffset: 8 }"
     :portal="false"
     :ui="{
-      content: 'z-50 w-[17rem] rounded-xl bg-default shadow-xl ring-1 ring-default',
+      content: 'z-50 w-[17rem] rounded-lg bg-default shadow-xl ring-1 ring-default',
     }"
   >
     <UButton
       color="neutral"
       variant="ghost"
-      block
-      class="group min-h-16 rounded-2xl border border-default bg-muted
-        px-2.5 text-left shadow-sm hover:bg-elevated active:translate-y-px"
+      :block="!collapsed"
+      class="group rounded-xl active:translate-y-px"
+      :class="collapsed
+        ? 'size-14 justify-center'
+        : 'min-h-16 border border-default px-2.5 text-left'"
       :ui="{
-        base: 'justify-start transition-[transform,background-color] duration-200',
+        base: 'justify-start transition-transform duration-200',
       }"
-      aria-label="Switch workspace"
+      :aria-label="collapsed
+        ? `Switch workspace, current workspace: ${currentWorkspace?.name ?? 'none'}`
+        : 'Switch workspace'"
     >
+      <UIcon
+        v-if="collapsed"
+        name="i-solar-buildings-3-bold-duotone"
+        class="size-5 shrink-0 text-primary"
+      />
+
       <span
-        class="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10
-          text-xs font-bold tracking-[0.08em] text-primary ring-1 ring-primary/20"
+        v-else
+        class="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10
+          text-primary ring-1 ring-primary/20"
       >
-        {{ workspaceInitials }}
+        <UIcon
+          name="i-solar-buildings-3-bold-duotone"
+          class="size-5"
+        />
       </span>
 
-      <span class="min-w-0 flex-1">
+      <span
+        v-if="!collapsed"
+        class="min-w-0 flex-1"
+      >
         <span class="block truncate text-sm font-semibold text-highlighted">
           {{ currentWorkspace?.name ?? 'Select workspace' }}
         </span>
@@ -81,6 +89,7 @@ const workspaceItems = computed<DropdownMenuItem[][]>(() => [
       </span>
 
       <UIcon
+        v-if="!collapsed"
         name="i-solar-alt-arrow-down-bold-duotone"
         class="size-4 shrink-0 text-dimmed transition-colors group-hover:text-highlighted"
       />
