@@ -11,3 +11,7 @@
   font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
     'SF Pro Display', Inter, sans-serif;
 }
+
+:root {
+  --ui-radius: 0.375rem;
+}

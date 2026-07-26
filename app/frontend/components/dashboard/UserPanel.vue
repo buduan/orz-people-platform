@@ -8,6 +8,7 @@ const props = defineProps<{
     avatarUrl: string | null;
     role: string;
   };
+  collapsed?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -27,8 +28,26 @@ const avatarText = computed(() => (
 
 <template>
   <div
-    class="flex min-h-16 items-center gap-3 rounded-2xl border border-default
-      bg-muted p-2.5 shadow-sm"
+    v-if="collapsed"
+    class="flex justify-center"
+  >
+    <UTooltip text="Log out">
+      <UButton
+        icon="i-solar-logout-2-bold-duotone"
+        color="neutral"
+        variant="ghost"
+        square
+        class="size-11 rounded-xl text-dimmed hover:bg-elevated
+          hover:text-highlighted active:translate-y-px"
+        aria-label="Log out"
+        @click="emit('logout')"
+      />
+    </UTooltip>
+  </div>
+
+  <div
+    v-else
+    class="flex min-h-16 items-center gap-3 rounded-xl border border-default p-2.5"
   >
     <UAvatar
       :src="user.avatarUrl ?? undefined"
