@@ -39,6 +39,22 @@ export class AuthRateLimitService {
     await this.redis.del(this.key(subject, networkContext));
   }
 
+  public async assertDiscoveryAllowed(subject: string, networkContext: string): Promise<void> {
+    const key = `auth:login-discovery:${this.digest(subject)}:${this.digest(networkContext)}`;
+    const count = await this.redis.incr(key);
+    if (count === 1) await this.redis.expire(key, this.settings.loginWindowSeconds);
+    if (count === this.settings.loginMaxAttempts) {
+      await this.audit.record({
+        action: 'authentication.discovery.rate_limit',
+        actorType: 'system',
+        resourceType: 'authentication_subject',
+        resourceId: this.digest(subject),
+        result: 'denied',
+      });
+    }
+    if (count >= this.settings.loginMaxAttempts) throw this.rateLimitError();
+  }
+
   private key(subject: string, networkContext: string): string {
     return `auth:login-fail:${this.digest(subject)}:${this.digest(networkContext)}`;
   }

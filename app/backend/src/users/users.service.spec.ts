@@ -64,4 +64,40 @@ describe('normalized identity uniqueness', () => {
       data: expect.objectContaining({ memberTypeId: 'guest-1', status: 'pending' }),
     });
   });
+
+  it('creates verified registrations and audit records in one transaction', async () => {
+    const tx = {
+      auditLog: { create: vi.fn() },
+      memberRole: { create: vi.fn() },
+      role: { findFirstOrThrow: vi.fn().mockResolvedValue({ id: 'role-1' }) },
+      user: { create: vi.fn().mockResolvedValue({ id: 'user-1', tokenVersion: 1 }) },
+      workspaceMember: { create: vi.fn().mockResolvedValue({ id: 'member-1' }) },
+      workspaceMemberType: { findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'guest-1' }) },
+    };
+    const prisma = {
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+    };
+    const audit = { record: vi.fn().mockResolvedValue(undefined) };
+    const service = new UsersService(prisma as never, {} as never, audit as never);
+
+    await expect(service.registerVerified({
+      email: 'user@example.com',
+      name: 'User',
+      username: 'user',
+    })).resolves.toEqual({ id: 'user-1', tokenVersion: 1 });
+    expect(tx.user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        emailVerifiedAt: expect.any(Date),
+        status: 'active',
+      }),
+    }));
+    expect(tx.workspaceMember.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ joinedAt: expect.any(Date), status: 'active' }),
+    });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'user.registration.complete',
+      resourceId: 'user-1',
+      result: 'success',
+    }), tx);
+  });
 });

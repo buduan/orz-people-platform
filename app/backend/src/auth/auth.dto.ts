@@ -7,6 +7,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -14,28 +15,55 @@ import {
 
 import { normalizeEmail, normalizeUsername } from '@orz-people-platform/utils';
 
-export class RegisterDto {
+export class RegistrationStartDto {
   @IsEmail()
   @Transform(({ value }) => normalizeEmail(String(value)))
   public email!: string;
+}
 
-  @Matches(/^[a-z][a-z0-9_-]{2,63}$/)
-  @Transform(({ value }) => normalizeUsername(String(value)))
-  public username!: string;
+export class RegistrationFlowDto {
+  @IsUUID()
+  public registrationId!: string;
+}
 
+export class RegistrationCodeDto extends RegistrationFlowDto {
+  @Matches(/^\d{6}$/)
+  public code!: string;
+}
+
+export class RegistrationCompleteDto extends RegistrationFlowDto {
   @IsString()
   @MinLength(1)
   @MaxLength(128)
   public name!: string;
 
-  @IsString()
-  @MinLength(1)
-  @MaxLength(128)
-  public nickname!: string;
+  @IsOptional()
+  @Matches(/^[a-z][a-z0-9_-]{2,63}$/)
+  @Transform(({ value }) => normalizeUsername(String(value)))
+  public username?: string;
 
   @IsOptional()
   @IsString()
-  public password?: string;
+  @MaxLength(128)
+  public deviceName?: string;
+}
+
+export class IdentifierDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(320)
+  @Transform(({ value }) => String(value).trim())
+  public identifier!: string;
+}
+
+export class CodeLoginDto extends IdentifierDto {
+  @Matches(/^\d{6}$/)
+  public code!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  public deviceName?: string;
 }
 
 export class EmailDto {
@@ -49,10 +77,7 @@ export class EmailCodeDto extends EmailDto {
   public code!: string;
 }
 
-export class PasswordLoginDto {
-  @IsString()
-  public identifier!: string;
-
+export class PasswordLoginDto extends IdentifierDto {
   @IsString()
   @MaxLength(128)
   public password!: string;
@@ -133,6 +158,19 @@ export class PasskeyAuthenticationVerifyDto {
   @IsString()
   @MaxLength(128)
   public deviceName?: string;
+}
+
+export class MfaPasskeyOptionsDto {
+  @IsUUID()
+  public challengeId!: string;
+}
+
+export class MfaPasskeyCompleteDto extends MfaPasskeyOptionsDto {
+  @IsUUID()
+  public assertionId!: string;
+
+  @IsObject()
+  public response!: AuthenticationResponseJSON;
 }
 
 export class PhoneCodeRequestDto {

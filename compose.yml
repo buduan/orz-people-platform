@@ -9,7 +9,7 @@ services:
     environment:
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
-      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-http://localhost:3000}
+      NUXT_PUBLIC_API_ORIGIN: ${API_ORIGIN:-http://localhost:3000}
     ports:
       - '${FRONTEND_PORT:-3001}:3000'
     depends_on:
@@ -24,6 +24,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      APP_ORIGIN: ${APP_ORIGIN}
+      API_ORIGIN: ${API_ORIGIN:-http://localhost:3000}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     ports:

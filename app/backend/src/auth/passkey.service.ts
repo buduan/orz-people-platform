@@ -16,7 +16,7 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 
-import type { AuthTokens } from '@orz-people-platform/types';
+import type { AuthCompleted } from '@orz-people-platform/types';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,11 +24,12 @@ import { RedisService } from '../redis/redis.service';
 import { AuthSettingsService } from './auth-settings.service';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { hasViableLoginPath } from './login-path';
-import { MfaService, type MfaRequired } from './mfa.service';
+import { MfaService } from './mfa.service';
 
 interface PasskeyChallenge {
   challenge: string;
-  kind: 'authentication' | 'registration';
+  kind: 'authentication' | 'mfa' | 'registration';
+  mfaChallengeId?: string;
   userId?: string;
 }
 
@@ -134,58 +135,73 @@ export class PasskeyService {
     response: AuthenticationResponseJSON,
     networkContext: string,
     deviceName?: string,
-  ): Promise<AuthTokens | MfaRequired> {
+  ): Promise<AuthCompleted> {
     await this.rateLimit.assertAllowed(response.id, networkContext);
     const challenge = await this.consumeChallenge(challengeId, 'authentication');
-    const passkey = await this.prisma.passkeyCredential.findUnique({
-      where: { credentialId: response.id },
-      include: { user: true },
-    });
-    if (!passkey || passkey.user.status !== 'active') {
-      await this.rateLimit.recordFailure(response.id, networkContext);
-      throw new UnauthorizedException('Invalid account or credentials');
-    }
-    if (response.response.userHandle
-      && Buffer.from(response.response.userHandle, 'base64url').toString('utf8') !== passkey.userId) {
-      throw new UnauthorizedException('Invalid account or credentials');
-    }
     try {
-      const result = await verifyAuthenticationResponse({
-        response,
-        expectedChallenge: challenge.challenge,
-        expectedOrigin: this.settings.webauthnOrigins,
-        expectedRPID: this.settings.webauthnRpId,
-        credential: {
-          id: passkey.credentialId,
-          publicKey: new Uint8Array(passkey.publicKey),
-          counter: Number(passkey.counter),
-          transports: passkey.transports as AuthenticatorTransportFuture[],
-        },
-        requireUserVerification: true,
-      });
-      if (!result.verified) throw new UnauthorizedException('Invalid account or credentials');
-      const updated = await this.prisma.passkeyCredential.updateMany({
-        where: { id: passkey.id, counter: passkey.counter },
-        data: {
-          counter: BigInt(result.authenticationInfo.newCounter),
-          backedUp: result.authenticationInfo.credentialBackedUp,
-          deviceType: result.authenticationInfo.credentialDeviceType,
-        },
-      });
-      if (updated.count !== 1) throw new UnauthorizedException('Invalid account or credentials');
+      const user = await this.verifyAssertion(challenge.challenge, response);
       await this.rateLimit.clear(response.id, networkContext);
-      return await this.mfa.continueOrCreateSession(passkey.user, 'passkey', deviceName);
+      const result = await this.mfa.continueOrCreateSession(user, 'passkey', deviceName);
+      if (result.outcome !== 'authenticated') throw new UnauthorizedException('Invalid authentication state');
+      return result;
     } catch (error: unknown) {
       await this.audit.record({
         action: 'passkey.authenticate',
         actorType: 'system',
         resourceType: 'passkey',
-        resourceId: passkey.id,
         result: 'failure',
       });
       await this.rateLimit.recordFailure(response.id, networkContext);
       if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException('Invalid account or credentials');
+    }
+  }
+
+  public async mfaAuthenticationOptions(mfaChallengeId: string) {
+    const userId = await this.mfa.passkeyUser(mfaChallengeId);
+    const credentials = await this.prisma.passkeyCredential.findMany({
+      where: { userId },
+      select: { credentialId: true, transports: true },
+    });
+    if (!credentials.length) throw new BadRequestException('MFA factor is not available');
+    const options = await generateAuthenticationOptions({
+      rpID: this.settings.webauthnRpId,
+      userVerification: 'required',
+      allowCredentials: credentials.map((credential) => ({
+        id: credential.credentialId,
+        transports: credential.transports as AuthenticatorTransportFuture[],
+      })),
+    });
+    const assertionId = await this.storeChallenge({
+      challenge: options.challenge,
+      kind: 'mfa',
+      mfaChallengeId,
+      userId,
+    });
+    return { assertionId, options };
+  }
+
+  public async verifyMfaAuthentication(
+    mfaChallengeId: string,
+    assertionId: string,
+    response: AuthenticationResponseJSON,
+  ): Promise<AuthCompleted> {
+    const challenge = await this.consumeChallenge(assertionId, 'mfa');
+    if (challenge.mfaChallengeId !== mfaChallengeId || !challenge.userId) {
+      throw new UnauthorizedException('Invalid MFA Passkey challenge');
+    }
+    try {
+      const user = await this.verifyAssertion(challenge.challenge, response, challenge.userId);
+      return await this.mfa.completePasskey(mfaChallengeId, user.id);
+    } catch (error: unknown) {
+      await this.audit.record({
+        action: 'mfa.passkey.complete',
+        actorType: 'system',
+        resourceType: 'authentication_challenge',
+        result: 'failure',
+      });
+      if (error instanceof UnauthorizedException) throw error;
+      throw new UnauthorizedException('Invalid MFA Passkey');
     }
   }
 
@@ -250,6 +266,49 @@ export class PasskeyService {
     const challenge = JSON.parse(raw) as PasskeyChallenge;
     if (challenge.kind !== kind) throw new UnauthorizedException('Invalid Passkey challenge');
     return challenge;
+  }
+
+  private async verifyAssertion(
+    expectedChallenge: string,
+    response: AuthenticationResponseJSON,
+    expectedUserId?: string,
+  ) {
+    const passkey = await this.prisma.passkeyCredential.findUnique({
+      where: { credentialId: response.id },
+      include: { user: true },
+    });
+    if (!passkey || passkey.user.status !== 'active'
+      || (expectedUserId && passkey.userId !== expectedUserId)) {
+      throw new UnauthorizedException('Invalid account or credentials');
+    }
+    if (response.response.userHandle
+      && Buffer.from(response.response.userHandle, 'base64url').toString('utf8') !== passkey.userId) {
+      throw new UnauthorizedException('Invalid account or credentials');
+    }
+    const result = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin: this.settings.webauthnOrigins,
+      expectedRPID: this.settings.webauthnRpId,
+      credential: {
+        id: passkey.credentialId,
+        publicKey: new Uint8Array(passkey.publicKey),
+        counter: Number(passkey.counter),
+        transports: passkey.transports as AuthenticatorTransportFuture[],
+      },
+      requireUserVerification: true,
+    });
+    if (!result.verified) throw new UnauthorizedException('Invalid account or credentials');
+    const updated = await this.prisma.passkeyCredential.updateMany({
+      where: { id: passkey.id, counter: passkey.counter },
+      data: {
+        counter: BigInt(result.authenticationInfo.newCounter),
+        backedUp: result.authenticationInfo.credentialBackedUp,
+        deviceType: result.authenticationInfo.credentialDeviceType,
+      },
+    });
+    if (updated.count !== 1) throw new UnauthorizedException('Invalid account or credentials');
+    return passkey.user;
   }
 
   private challengeKey(id: string): string {

@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { MemberStatus, Prisma, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 
-import type { UserProfile } from '@orz-people-platform/types';
+import { apiStatuses, type UserProfile } from '@orz-people-platform/types';
 import { validatePassword } from '@orz-people-platform/utils';
 
 import { AuditService } from '../audit/audit.service';
@@ -105,6 +105,73 @@ export class UsersService {
     } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('Email, username or phone already exists');
+      }
+      throw error;
+    }
+  }
+
+  public async registerVerified(input: {
+    email: string;
+    name: string;
+    username: string;
+  }): Promise<{ id: string; tokenVersion: number }> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        const created = await tx.user.create({
+          data: {
+            email: input.email,
+            username: input.username,
+            name: input.name,
+            nickname: input.name,
+            emailVerifiedAt: now,
+            status: UserStatus.active,
+          },
+          select: { id: true, tokenVersion: true },
+        });
+        const workspaceId = WorkspacesService.DEFAULT_ID;
+        const [role, guestType] = await Promise.all([
+          tx.role.findFirstOrThrow({ where: { workspaceId, isDefault: true } }),
+          tx.workspaceMemberType.findUniqueOrThrow({
+            where: { workspaceId_slug: { workspaceId, slug: 'guest' } },
+          }),
+        ]);
+        const member = await tx.workspaceMember.create({
+          data: {
+            workspaceId,
+            userId: created.id,
+            memberTypeId: guestType.id,
+            status: MemberStatus.active,
+            joinedAt: now,
+          },
+        });
+        await tx.memberRole.create({
+          data: {
+            memberId: member.id,
+            roleId: role.id,
+            assignedByUserId: created.id,
+          },
+        });
+        await this.audit.record({
+          action: 'user.registration.complete',
+          actorType: 'system',
+          resourceType: 'user',
+          resourceId: created.id,
+          result: 'success',
+          workspaceId,
+        }, tx);
+        return created;
+      });
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const target = Array.isArray(error.meta?.target) ? error.meta.target : [];
+        if (target.includes('username')) {
+          throw new ConflictException({
+            status: apiStatuses.usernameUnavailable,
+            message: 'Username is unavailable',
+          });
+        }
+        throw new ConflictException('Email is already registered');
       }
       throw error;
     }

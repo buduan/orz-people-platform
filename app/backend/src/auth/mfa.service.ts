@@ -8,7 +8,9 @@ import {
 import { User } from '@prisma/client';
 import * as OTPAuth from 'otpauth';
 
-import type { AuthTokens } from '@orz-people-platform/types';
+import type {
+  AuthCompleted, AuthenticationResult, MfaFactor,
+} from '@orz-people-platform/types';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,8 +23,6 @@ import { ReauthenticationService } from './reauthentication.service';
 import { SessionService } from './session.service';
 
 export type AuthFactor = 'email' | 'passkey' | 'password';
-export type MfaFactor = 'email' | 'sms' | 'totp';
-
 interface MfaChallenge {
   allowed: MfaFactor[];
   attempts: number;
@@ -30,12 +30,6 @@ interface MfaChallenge {
   primary: AuthFactor;
   tokenVersion: number;
   userId: string;
-}
-
-export interface MfaRequired {
-  mfaRequired: true;
-  challengeId: string;
-  factors: MfaFactor[];
 }
 
 @Injectable()
@@ -51,15 +45,23 @@ export class MfaService {
   ) {}
 
   public async continueOrCreateSession(
-    user: Pick<User, 'emailMfaEnabled' | 'id' | 'phone' | 'smsMfaEnabled' | 'tokenVersion' | 'totpEnabledAt'>,
+    user: Pick<User, 'emailMfaEnabled' | 'emailVerifiedAt' | 'id' | 'phone' | 'phoneVerifiedAt' | 'smsMfaEnabled' | 'tokenVersion' | 'totpEnabledAt'>,
     primary: AuthFactor,
     deviceName?: string,
-  ): Promise<AuthTokens | MfaRequired> {
+  ): Promise<AuthenticationResult> {
+    if (primary !== 'password') {
+      return this.authenticated(await this.sessions.create(user.id, user.tokenVersion, deviceName));
+    }
     const allowed: MfaFactor[] = [];
-    if (user.emailMfaEnabled && primary !== 'email') allowed.push('email');
-    if (user.smsMfaEnabled && user.phone) allowed.push('sms');
+    if (user.emailMfaEnabled && user.emailVerifiedAt) allowed.push('email');
+    if (user.smsMfaEnabled && user.phone && user.phoneVerifiedAt) allowed.push('sms');
     if (user.totpEnabledAt) allowed.push('totp');
-    if (!allowed.length) return this.sessions.create(user.id, user.tokenVersion, deviceName);
+    if (await this.prisma.passkeyCredential.count({ where: { userId: user.id } })) {
+      allowed.push('passkey');
+    }
+    if (!allowed.length) {
+      return this.authenticated(await this.sessions.create(user.id, user.tokenVersion, deviceName));
+    }
     const challengeId = randomUUID();
     await this.redis.set(
       this.challengeKey(challengeId),
@@ -74,7 +76,12 @@ export class MfaService {
       'EX',
       this.settings.challengeTtlSeconds,
     );
-    return { mfaRequired: true, challengeId, factors: allowed };
+    return {
+      outcome: 'mfa_required',
+      challengeId,
+      factors: allowed,
+      expiresIn: this.settings.challengeTtlSeconds,
+    };
   }
 
   public async requestCode(challengeId: string, factor: 'email' | 'sms'): Promise<void> {
@@ -89,7 +96,11 @@ export class MfaService {
     else if (user.phone) await this.otp.requestSms(user.phone, 'mfa_sms');
   }
 
-  public async complete(challengeId: string, factor: MfaFactor, code: string): Promise<AuthTokens> {
+  public async complete(
+    challengeId: string,
+    factor: Exclude<MfaFactor, 'passkey'>,
+    code: string,
+  ): Promise<AuthCompleted> {
     const challenge = await this.getChallenge(challengeId);
     if (!challenge.allowed.includes(factor)) throw new BadRequestException('MFA factor is not available');
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: challenge.userId } });
@@ -105,7 +116,33 @@ export class MfaService {
       throw error;
     }
     await this.redis.del(this.challengeKey(challengeId));
-    return this.sessions.create(user.id, challenge.tokenVersion, challenge.deviceName);
+    return this.authenticated(
+      await this.sessions.create(user.id, challenge.tokenVersion, challenge.deviceName),
+    );
+  }
+
+  public async passkeyUser(challengeId: string): Promise<string> {
+    const challenge = await this.getChallenge(challengeId);
+    if (!challenge.allowed.includes('passkey')) {
+      throw new BadRequestException('MFA factor is not available');
+    }
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: challenge.userId } });
+    if (user.status !== 'active' || user.tokenVersion !== challenge.tokenVersion) {
+      await this.redis.del(this.challengeKey(challengeId));
+      throw new UnauthorizedException('MFA challenge is no longer valid');
+    }
+    return user.id;
+  }
+
+  public async completePasskey(challengeId: string, userId: string): Promise<AuthCompleted> {
+    const challenge = await this.getChallenge(challengeId);
+    if (!challenge.allowed.includes('passkey') || challenge.userId !== userId) {
+      throw new UnauthorizedException('Invalid MFA Passkey');
+    }
+    await this.redis.del(this.challengeKey(challengeId));
+    return this.authenticated(
+      await this.sessions.create(userId, challenge.tokenVersion, challenge.deviceName),
+    );
   }
 
   public settingsFor(userId: string) {
@@ -292,5 +329,9 @@ export class MfaService {
       this.prisma.passkeyCredential.count({ where: { userId } }),
     ]);
     return { ...user, passkeyCount };
+  }
+
+  private authenticated(tokens: AuthCompleted['tokens']): AuthCompleted {
+    return { outcome: 'authenticated', tokens };
   }
 }

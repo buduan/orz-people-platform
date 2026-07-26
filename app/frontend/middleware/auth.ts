@@ -1,14 +1,18 @@
-export default defineNuxtRouteMiddleware((to) => {
-  const authStore = useAuthStore();
+import { resolveSafeRedirect } from '~/utils/redirect';
 
-  // 需要登录才能访问的页面
+export default defineNuxtRouteMiddleware((to) => {
+  const authStore = useAuthStore(useNuxtApp().$pinia);
+
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return navigateTo('/auth/login');
+    return navigateTo({
+      path: '/auth/login',
+      query: { redirect: to.fullPath },
+    });
   }
 
-  // 仅限未登录用户访问的页面（如登录、注册页）
   if (to.meta.guestOnly && authStore.isAuthenticated) {
-    return navigateTo('/');
+    const origin = import.meta.client ? window.location.origin : useRequestURL().origin;
+    return navigateTo(resolveSafeRedirect(to.query.redirect, origin));
   }
 
   return undefined;

@@ -9,7 +9,7 @@ import { CurrentActor, RequirePermissions } from '../authorization/authorization
 import { CreateUserDto, UpdateProfileDto, UpdateUserStatusDto } from './users.dto';
 import { UsersService } from './users.service';
 
-@Controller('users')
+@Controller('user')
 @ApiTags('Users')
 @ApiBearerAuth()
 export class UsersController {

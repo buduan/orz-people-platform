@@ -8,12 +8,12 @@ servers:
     description: Local development
 tags:
   - name: System
-    description: Service-level operations
+  - name: Authentication
+  - name: Users
 paths:
   /health:
     get:
-      tags:
-        - System
+      tags: [System]
       summary: Check service health
       operationId: getHealth
       responses:
@@ -22,27 +22,706 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
+                $ref: '#/components/schemas/HealthEnvelope'
+  /auth/login/options:
+    post:
+      tags: [Authentication]
+      summary: Discover whether an identifier enters login or registration
+      operationId: discoverLoginOptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdentifierRequest'
+      responses:
+        '200':
+          description: The next public authentication step.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginOptionsEnvelope'
+        '400':
+          description: The username or phone does not belong to an account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountNotFoundEnvelope'
+  /auth/register/start:
+    post:
+      tags: [Authentication]
+      summary: Start a short-lived email registration flow
+      operationId: startRegistration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '201':
+          description: Registration flow created and initial code requested.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationStartedEnvelope'
+  /auth/register/code/request:
+    post:
+      tags: [Authentication]
+      summary: Request or resend the registration email code
+      operationId: requestRegistrationCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationFlowRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /auth/register/code/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify the registration email code
+      operationId: verifyRegistrationCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationCodeRequest'
+      responses:
+        '200':
+          description: The registration email was verified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationVerifiedEnvelope'
+  /auth/register/complete:
+    post:
+      tags: [Authentication]
+      summary: Create the verified user and return Tokens
+      operationId: completeRegistration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationCompleteRequest'
+      responses:
+        '200':
+          description: Registration completed and a Session was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationEnvelope'
+  /auth/login/password:
+    post:
+      tags: [Authentication]
+      summary: Sign in with password
+      operationId: loginWithPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordLoginRequest'
+      responses:
+        '200':
+          description: Tokens or a password-primary MFA challenge.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationEnvelope'
+  /auth/login/code/request:
+    post:
+      tags: [Authentication]
+      summary: Request a non-enumerating email login code by identifier
+      operationId: requestLoginCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdentifierRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /auth/login/code/verify:
+    post:
+      tags: [Authentication]
+      summary: Sign in with an email code
+      operationId: loginWithCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeLoginRequest'
+      responses:
+        '200':
+          description: Code verified and a Session was created without secondary MFA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationEnvelope'
+  /auth/login/passkey/options:
+    post:
+      tags: [Authentication]
+      summary: Create discoverable Passkey assertion options
+      operationId: createPasskeyLoginOptions
+      responses:
+        '201':
+          description: One-time challenge and WebAuthn request options.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasskeyOptionsEnvelope'
+  /auth/login/passkey/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify a direct Passkey login
+      operationId: verifyPasskeyLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasskeyVerifyRequest'
+      responses:
+        '200':
+          description: Passkey verified and a Session was created without secondary MFA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationEnvelope'
+  /auth/mfa/code/request:
+    post:
+      tags: [Authentication]
+      summary: Request an email or SMS MFA code
+      operationId: requestMfaCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaCodeRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedAccepted'
+  /auth/mfa/complete:
+    post:
+      tags: [Authentication]
+      summary: Complete message or TOTP MFA
+      operationId: completeMfa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaCompleteRequest'
+      responses:
+        '200':
+          description: MFA completed and a Session was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationEnvelope'
+  /auth/mfa/passkey/options:
+    post:
+      tags: [Authentication]
+      summary: Create Passkey assertion options bound to an MFA challenge
+      operationId: createMfaPasskeyOptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaPasskeyOptionsRequest'
+      responses:
+        '200':
+          description: One-time bound assertion and WebAuthn request options.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaPasskeyOptionsEnvelope'
+  /auth/mfa/passkey/complete:
+    post:
+      tags: [Authentication]
+      summary: Complete Passkey MFA
+      operationId: completeMfaPasskey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaPasskeyCompleteRequest'
+      responses:
+        '200':
+          description: Passkey MFA completed and a Session was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationEnvelope'
+  /auth/token/refresh:
+    post:
+      tags: [Authentication]
+      summary: Atomically replace a refresh Token pair
+      operationId: refreshTokens
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Replacement Tokens.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokensEnvelope'
+  /auth/password/reset/request:
+    post:
+      tags: [Authentication]
+      summary: Request a non-enumerating password reset code
+      operationId: requestPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedAccepted'
+  /auth/password/reset:
+    post:
+      tags: [Authentication]
+      summary: Reset a password using an email code
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedAccepted'
+  /user/me:
+    get:
+      tags: [Users]
+      summary: Get the authenticated user profile
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current safe user profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Accepted:
+      description: The request was accepted without revealing account state.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AcceptedEnvelope'
+    CreatedAccepted:
+      description: The request was accepted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreatedAcceptedEnvelope'
   schemas:
-    HealthResponse:
+    EnvelopeBase:
       type: object
-      required:
-        - data
-        - timestamp
+      required: [status, data, timestamp]
       properties:
-        data:
-          type: object
-          required:
-            - service
-            - status
-          properties:
-            service:
-              type: string
-              example: orz-people-platform-backend
-            status:
-              type: string
-              example: ok
+        status:
+          type: string
+          enum:
+            - success
+            - bad_request
+            - unauthorized
+            - forbidden
+            - not_found
+            - conflict
+            - rate_limited
+            - internal_error
+            - unknown
+            - account_not_found
+            - invalid_credentials
+            - registration_expired
+            - registration_unverified
+            - username_unavailable
         timestamp:
           type: string
           format: date-time
+    AccountNotFoundEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [message]
+          properties:
+            status:
+              const: account_not_found
+            data:
+              type: 'null'
+            message:
+              type: string
+    HealthEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [service, status]
+              properties:
+                service:
+                  type: string
+                  example: orz-people-platform-backend
+                status:
+                  type: string
+                  example: ok
+    AcceptedEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            status:
+              const: success
+            data:
+              type: object
+              required: [accepted]
+              properties:
+                accepted:
+                  const: true
+    CreatedAcceptedEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            status:
+              const: success
+            data:
+              type: object
+              required: [accepted]
+              properties:
+                accepted:
+                  const: true
+    EmailRequest:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+    IdentifierRequest:
+      type: object
+      required: [identifier]
+      additionalProperties: false
+      properties:
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 320
+    RegistrationFlowRequest:
+      type: object
+      required: [registrationId]
+      additionalProperties: false
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+    RegistrationCodeRequest:
+      allOf:
+        - $ref: '#/components/schemas/RegistrationFlowRequest'
+        - type: object
+          required: [code]
+          properties:
+            code:
+              type: string
+              pattern: '^\d{6}$'
+    RegistrationCompleteRequest:
+      type: object
+      required: [registrationId, name]
+      additionalProperties: false
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        username:
+          type: string
+          pattern: '^[a-z][a-z0-9_-]{2,63}$'
+        deviceName:
+          type: string
+          maxLength: 128
+    PasswordLoginRequest:
+      allOf:
+        - $ref: '#/components/schemas/IdentifierRequest'
+        - type: object
+          required: [password]
+          properties:
+            password:
+              type: string
+              maxLength: 128
+            deviceName:
+              type: string
+              maxLength: 128
+    CodeLoginRequest:
+      allOf:
+        - $ref: '#/components/schemas/IdentifierRequest'
+        - type: object
+          required: [code]
+          properties:
+            code:
+              type: string
+              pattern: '^\d{6}$'
+            deviceName:
+              type: string
+              maxLength: 128
+    PasswordResetRequest:
+      type: object
+      required: [email, code, newPassword]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          pattern: '^\d{6}$'
+        newPassword:
+          type: string
+    MfaCodeRequest:
+      type: object
+      required: [challengeId, factor]
+      additionalProperties: false
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        factor:
+          type: string
+          enum: [email, sms]
+    MfaCompleteRequest:
+      type: object
+      required: [challengeId, factor, code]
+      additionalProperties: false
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        factor:
+          type: string
+          enum: [email, sms, totp]
+        code:
+          type: string
+          pattern: '^\d{6}$'
+    MfaPasskeyOptionsRequest:
+      type: object
+      required: [challengeId]
+      additionalProperties: false
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+    PasskeyVerifyRequest:
+      type: object
+      required: [challengeId, response]
+      additionalProperties: false
+      properties:
+        challengeId:
+          type: string
+        response:
+          type: object
+          additionalProperties: true
+        deviceName:
+          type: string
+          maxLength: 128
+    MfaPasskeyCompleteRequest:
+      type: object
+      required: [challengeId, assertionId, response]
+      additionalProperties: false
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        assertionId:
+          type: string
+          format: uuid
+        response:
+          type: object
+          additionalProperties: true
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken, accessTokenExpiresIn]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        accessTokenExpiresIn:
+          type: integer
+          minimum: 1
+    AuthenticatedOutcome:
+      type: object
+      required: [outcome, tokens]
+      properties:
+        outcome:
+          const: authenticated
+        tokens:
+          $ref: '#/components/schemas/AuthTokens'
+    MfaRequiredOutcome:
+      type: object
+      required: [outcome, challengeId, factors, expiresIn]
+      properties:
+        outcome:
+          const: mfa_required
+        challengeId:
+          type: string
+          format: uuid
+        factors:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [email, sms, totp, passkey]
+        expiresIn:
+          type: integer
+          minimum: 1
+    AuthenticationResult:
+      oneOf:
+        - $ref: '#/components/schemas/AuthenticatedOutcome'
+        - $ref: '#/components/schemas/MfaRequiredOutcome'
+      discriminator:
+        propertyName: outcome
+    AuthenticationEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AuthenticationResult'
+    AuthTokensEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AuthTokens'
+    LoginOptions:
+      oneOf:
+        - type: object
+          required: [next]
+          properties:
+            next:
+              const: login
+        - type: object
+          required: [next, email]
+          properties:
+            next:
+              const: register
+            email:
+              type: string
+              format: email
+      discriminator:
+        propertyName: next
+    LoginOptionsEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/LoginOptions'
+    RegistrationStarted:
+      type: object
+      required: [registrationId, expiresIn]
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+        expiresIn:
+          type: integer
+          minimum: 1
+    RegistrationStartedEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/RegistrationStarted'
+    RegistrationVerifiedEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [verified]
+              properties:
+                verified:
+                  const: true
+    PasskeyOptionsEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [challengeId, options]
+              properties:
+                challengeId:
+                  type: string
+                options:
+                  type: object
+                  additionalProperties: true
+    MfaPasskeyOptionsEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [assertionId, options]
+              properties:
+                assertionId:
+                  type: string
+                  format: uuid
+                options:
+                  type: object
+                  additionalProperties: true
+    UserEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [id, email, username, nickname, status]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                email:
+                  type: string
+                  format: email
+                username:
+                  type: string
+                nickname:
+                  type: string
+                status:
+                  type: string
+                  enum: [pending, active, disabled]

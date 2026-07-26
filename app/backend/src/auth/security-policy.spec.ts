@@ -9,22 +9,24 @@ import {
   validatePassword,
 } from '@orz-people-platform/utils';
 
-import { RegisterDto } from './auth.dto';
+import { RegistrationCompleteDto, RegistrationStartDto } from './auth.dto';
 import { hasViableLoginPath } from './login-path';
 
 describe('identity normalization and password policy', () => {
   it('normalizes globally unique identity inputs before persistence', async () => {
-    const dto = plainToInstance(RegisterDto, {
+    const startDto = plainToInstance(RegistrationStartDto, {
       email: '  Admin@Example.COM ',
+    });
+    const completeDto = plainToInstance(RegistrationCompleteDto, {
+      registrationId: '4f41d2e9-ef5c-4dd1-a81e-88922c83de9b',
       username: '  Admin_User ',
       name: 'Admin User',
-      nickname: 'Admin',
     });
 
-    expect(await validate(dto)).toHaveLength(0);
-    expect(dto.email).toBe('admin@example.com');
-    expect(dto.username).toBe('admin_user');
-    expect(dto.password).toBeUndefined();
+    expect(await validate(startDto)).toHaveLength(0);
+    expect(await validate(completeDto)).toHaveLength(0);
+    expect(startDto.email).toBe('admin@example.com');
+    expect(completeDto.username).toBe('admin_user');
     expect(normalizeEmail(' A@EXAMPLE.COM ')).toBe('a@example.com');
     expect(normalizeUsername(' Example_User ')).toBe('example_user');
   });

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { ApiResponse } from '@orz-people-platform/types';
+import { apiStatuses, type ApiResponse } from '@orz-people-platform/types';
 
 const serviceStatus: ApiResponse<{ service: string; status: string }> = {
-  status: 200,
+  status: apiStatuses.success,
   data: {
     service: 'orz-people-platform-frontend',
     status: 'ready',

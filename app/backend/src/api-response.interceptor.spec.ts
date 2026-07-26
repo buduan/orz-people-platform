@@ -11,11 +11,13 @@ import {
   vi,
 } from 'vitest';
 
+import { apiStatuses } from '@orz-people-platform/types';
+
 import { ApiResponseInterceptor } from './api-response.interceptor';
 import { HttpExceptionFilter } from './http-exception.filter';
 
 describe('HTTP response envelope', () => {
-  it('wraps successful controller data with its HTTP status', async () => {
+  it('wraps successful controller data with a business status', async () => {
     const handler = () => undefined;
     const context = {
       getHandler: () => handler,
@@ -25,7 +27,10 @@ describe('HTTP response envelope', () => {
 
     const response = await lastValueFrom(new ApiResponseInterceptor().intercept(context, next));
 
-    expect(response).toMatchObject({ status: HttpStatus.CREATED, data: { accepted: true } });
+    expect(response).toMatchObject({
+      status: apiStatuses.success,
+      data: { accepted: true },
+    });
     expect(response.timestamp).toEqual(expect.any(String));
   });
 
@@ -40,9 +45,28 @@ describe('HTTP response envelope', () => {
 
     expect(response.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
     expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
-      status: HttpStatus.BAD_REQUEST,
+      status: apiStatuses.badRequest,
       data: null,
       message: 'email is invalid; username is required',
+    }));
+  });
+
+  it('keeps HTTP 400 separate from a custom business status', () => {
+    const response = { json: vi.fn(), status: vi.fn() };
+    response.status.mockReturnValue(response);
+    const host = {
+      switchToHttp: () => ({ getResponse: () => response }),
+    } as unknown as ExecutionContext;
+
+    new HttpExceptionFilter().catch(new BadRequestException({
+      status: apiStatuses.accountNotFound,
+      message: 'Account not found',
+    }), host);
+
+    expect(response.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      status: apiStatuses.accountNotFound,
+      message: 'Account not found',
     }));
   });
 });

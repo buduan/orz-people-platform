@@ -1,27 +1,42 @@
 import {
-  Body, Controller, Delete, Get, Headers, Ip, Param, Post, Put,
+  Body, Controller, Delete, Get, Headers, HttpCode, HttpStatus, Ip, Param, Post, Put,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiAcceptedResponse,
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import type { ApiResponseNoStatusOptions } from '@nestjs/swagger';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import { apiStatuses, type AuthenticatedActor } from '@orz-people-platform/types';
 
 import { CurrentActor, Public } from '../authorization/authorization.decorators';
 import { AuditService } from '../audit/audit.service';
 import {
-  EmailCodeDto,
+  CodeLoginDto,
   EmailDto,
+  IdentifierDto,
   PasswordChangeDto,
   PasswordLoginDto,
   PasswordResetDto,
   MfaCodeRequestDto,
   MfaCompleteDto,
   MfaSettingDto,
+  MfaPasskeyCompleteDto,
+  MfaPasskeyOptionsDto,
   PasskeyAuthenticationVerifyDto,
   PasskeyRegistrationVerifyDto,
   PhoneCodeConfirmDto,
   PhoneCodeRequestDto,
   ReauthenticateDto,
-  RegisterDto,
+  RegistrationCodeDto,
+  RegistrationCompleteDto,
+  RegistrationFlowDto,
+  RegistrationStartDto,
   TotpCodeDto,
 } from './auth.dto';
 import { AuthService } from './auth.service';
@@ -36,6 +51,46 @@ function bearer(header?: string): string {
   return scheme === 'Bearer' && token ? token : '';
 }
 
+type ResponseSchema = Extract<ApiResponseNoStatusOptions, { schema: unknown }>['schema'];
+
+const authTokensSchema: ResponseSchema = {
+  type: 'object',
+  required: ['accessToken', 'refreshToken', 'accessTokenExpiresIn'],
+  properties: {
+    accessToken: { type: 'string' },
+    refreshToken: { type: 'string' },
+    accessTokenExpiresIn: { type: 'integer', minimum: 1 },
+  },
+};
+
+const authenticationResultSchema: ResponseSchema = {
+  oneOf: [
+    {
+      type: 'object',
+      required: ['outcome', 'tokens'],
+      properties: {
+        outcome: { type: 'string', enum: ['authenticated'] },
+        tokens: authTokensSchema,
+      },
+    },
+    {
+      type: 'object',
+      required: ['outcome', 'challengeId', 'factors', 'expiresIn'],
+      properties: {
+        outcome: { type: 'string', enum: ['mfa_required'] },
+        challengeId: { type: 'string', format: 'uuid' },
+        factors: {
+          type: 'array',
+          minItems: 1,
+          items: { type: 'string', enum: ['email', 'sms', 'totp', 'passkey'] },
+        },
+        expiresIn: { type: 'integer', minimum: 1 },
+      },
+    },
+  ],
+  discriminator: { propertyName: 'outcome' },
+};
+
 @Controller('auth')
 @ApiTags('Authentication')
 export class AuthController {
@@ -49,36 +104,124 @@ export class AuthController {
     private readonly audit: AuditService,
   ) {}
 
-  @Post('register')
+  @Post('login/options')
   @Public()
-  public register(@Body() dto: RegisterDto, @Ip() ip: string) {
-    return this.auth.register(dto, ip);
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Discover whether an identifier enters login or registration' })
+  @ApiOkResponse({
+    schema: {
+      oneOf: [
+        {
+          type: 'object',
+          required: ['next'],
+          properties: { next: { type: 'string', enum: ['login'] } },
+        },
+        {
+          type: 'object',
+          required: ['next', 'email'],
+          properties: {
+            next: { type: 'string', enum: ['register'] },
+            email: { type: 'string', format: 'email' },
+          },
+        },
+      ],
+      discriminator: { propertyName: 'next' },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'The username or phone does not belong to an account.',
+    schema: {
+      type: 'object',
+      required: ['status', 'data', 'message', 'timestamp'],
+      properties: {
+        status: { type: 'string', enum: [apiStatuses.accountNotFound] },
+        data: { type: 'null' },
+        message: { type: 'string' },
+        timestamp: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  public loginOptions(@Body() dto: IdentifierDto, @Ip() ip: string) {
+    return this.auth.loginOptions(dto.identifier, ip);
   }
 
-  @Post('register/confirm')
+  @Post('register/start')
   @Public()
-  public async confirmRegistration(@Body() dto: EmailCodeDto) {
-    await this.auth.confirmRegistration(dto.email, dto.code);
+  @ApiOperation({ summary: 'Start a short-lived email registration flow' })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['registrationId', 'expiresIn'],
+      properties: {
+        registrationId: { type: 'string', format: 'uuid' },
+        expiresIn: { type: 'integer', minimum: 1 },
+      },
+    },
+  })
+  public startRegistration(@Body() dto: RegistrationStartDto, @Ip() ip: string) {
+    return this.auth.startRegistration(dto.email, ip);
+  }
+
+  @Post('register/code/request')
+  @Public()
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Request or resend the registration email code' })
+  @ApiAcceptedResponse({ description: 'The request was accepted.' })
+  public async requestRegistrationCode(@Body() dto: RegistrationFlowDto, @Ip() ip: string) {
+    await this.auth.requestRegistrationCode(dto.registrationId, ip);
     return { accepted: true };
+  }
+
+  @Post('register/code/verify')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify the registration email code' })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['verified'],
+      properties: { verified: { type: 'boolean', enum: [true] } },
+    },
+  })
+  public verifyRegistrationCode(@Body() dto: RegistrationCodeDto) {
+    return this.auth.verifyRegistrationCode(dto.registrationId, dto.code);
+  }
+
+  @Post('register/complete')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Create the verified user and return Tokens' })
+  @ApiOkResponse({ schema: authenticationResultSchema })
+  public completeRegistration(@Body() dto: RegistrationCompleteDto) {
+    return this.auth.completeRegistration(dto);
   }
 
   @Post('login/password')
   @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sign in with password, returning Tokens or an MFA challenge' })
+  @ApiOkResponse({ schema: authenticationResultSchema })
   public loginWithPassword(@Body() dto: PasswordLoginDto, @Ip() ip: string) {
     return this.auth.loginWithPassword(dto, ip);
   }
 
-  @Post('login/email/request')
+  @Post('login/code/request')
   @Public()
-  public async requestEmailLogin(@Body() dto: EmailDto, @Ip() ip: string) {
-    await this.otp.requestEmail(dto.email, 'email_login', ip);
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Request a non-enumerating email login code by identifier' })
+  @ApiAcceptedResponse({ description: 'The request was accepted.' })
+  public async requestEmailLogin(@Body() dto: IdentifierDto, @Ip() ip: string) {
+    await this.auth.requestEmailLogin(dto.identifier, ip);
     return { accepted: true };
   }
 
-  @Post('login/email')
+  @Post('login/code/verify')
   @Public()
-  public loginWithEmail(@Body() dto: EmailCodeDto, @Ip() ip: string) {
-    return this.auth.loginWithEmailCode(dto.email, dto.code, ip);
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sign in with an email code and return Tokens' })
+  @ApiOkResponse({ schema: authenticationResultSchema })
+  public loginWithEmail(@Body() dto: CodeLoginDto, @Ip() ip: string) {
+    return this.auth.loginWithEmailCode(dto.identifier, dto.code, ip, dto.deviceName);
   }
 
   @Post('token/refresh')
@@ -166,8 +309,33 @@ export class AuthController {
 
   @Post('mfa/complete')
   @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete message or TOTP MFA and return Tokens' })
+  @ApiOkResponse({ schema: authenticationResultSchema })
   public completeMfa(@Body() dto: MfaCompleteDto) {
     return this.mfa.complete(dto.challengeId, dto.factor, dto.code);
+  }
+
+  @Post('mfa/passkey/options')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Create Passkey assertion options bound to an MFA challenge' })
+  @ApiOkResponse({ description: 'Passkey assertion options and a one-time assertion ID.' })
+  public mfaPasskeyOptions(@Body() dto: MfaPasskeyOptionsDto) {
+    return this.passkeys.mfaAuthenticationOptions(dto.challengeId);
+  }
+
+  @Post('mfa/passkey/complete')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete Passkey MFA and return Tokens' })
+  @ApiOkResponse({ schema: authenticationResultSchema })
+  public completeMfaPasskey(@Body() dto: MfaPasskeyCompleteDto) {
+    return this.passkeys.verifyMfaAuthentication(
+      dto.challengeId,
+      dto.assertionId,
+      dto.response,
+    );
   }
 
   @Get('mfa/settings')
@@ -230,12 +398,17 @@ export class AuthController {
 
   @Post('login/passkey/options')
   @Public()
+  @ApiOperation({ summary: 'Create discoverable Passkey login assertion options' })
+  @ApiCreatedResponse({ description: 'Passkey assertion options and a one-time challenge ID.' })
   public passkeyAuthenticationOptions() {
     return this.passkeys.authenticationOptions();
   }
 
-  @Post('login/passkey')
+  @Post('login/passkey/verify')
   @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify a direct Passkey login and return Tokens' })
+  @ApiOkResponse({ schema: authenticationResultSchema })
   public verifyPasskeyAuthentication(
   @Body() dto: PasskeyAuthenticationVerifyDto,
     @Ip() ip: string,
