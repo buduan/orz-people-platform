@@ -16,15 +16,30 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxt/ui', '@pinia/nuxt'],
   runtimeConfig: {
     public: {
       apiBase: 'http://localhost:3000',
     },
   },
+  fonts: {
+    families: [
+      {
+        name: 'Noto Sans SC',
+        provider: 'google',
+        global: true,
+        weights: [400, 500, 600, 700],
+      },
+      {
+        name: 'Inter',
+        provider: 'google',
+        global: true,
+        weights: [400, 500, 600, 700],
+      },
+    ],
+  },
   ui: {
-    // Avoid build-time font-provider requests; the application uses system fonts by default.
-    fonts: false,
+    fonts: true,
   },
   typescript: {
     strict: true,

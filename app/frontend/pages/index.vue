@@ -2,6 +2,7 @@
 import type { ApiResponse } from '@orz-people-platform/types';
 
 const serviceStatus: ApiResponse<{ service: string; status: string }> = {
+  status: 200,
   data: {
     service: 'orz-people-platform-frontend',
     status: 'ready',

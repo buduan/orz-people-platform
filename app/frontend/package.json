@@ -12,8 +12,13 @@
     "@nuxt/ui": "^3.3.7",
     "@orz-people-platform/types": "workspace:*",
     "@orz-people-platform/utils": "workspace:*",
+    "@pinia/nuxt": "catalog:",
     "dotenv": "^16.6.1",
     "nuxt": "catalog:",
+    "pinia": "catalog:",
     "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@iconify-json/solar": "^1.2.5"
   }
 }

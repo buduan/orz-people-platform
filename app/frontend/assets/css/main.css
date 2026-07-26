@@ -1,2 +1,13 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
+
+@theme static {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', Inter,
+    'Noto Sans SC', sans-serif;
+}
+
+:lang(zh),
+[lang|='zh'] {
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'SF Pro Display', Inter, sans-serif;
+}
