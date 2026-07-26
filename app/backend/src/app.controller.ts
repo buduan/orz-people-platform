@@ -18,7 +18,7 @@ export class AppController {
       type: 'object',
       required: ['status', 'data', 'timestamp'],
       properties: {
-        status: { type: 'integer', example: 200 },
+        status: { type: 'string', example: 'success' },
         data: {
           type: 'object',
           required: ['service', 'status'],

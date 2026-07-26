@@ -1,4 +1,5 @@
 import type { PermissionKey } from './permissions';
+import { apiStatuses } from './api';
 
 export const userStatuses = ['pending', 'active', 'disabled'] as const;
 export type UserStatus = (typeof userStatuses)[number];
@@ -41,6 +42,45 @@ export interface AuthTokens {
   refreshToken: string;
   accessTokenExpiresIn: number;
 }
+
+export const mfaFactors = ['email', 'sms', 'totp', 'passkey'] as const;
+export type MfaFactor = (typeof mfaFactors)[number];
+
+export type LoginOptions =
+  | { next: 'login' }
+  | { next: 'register'; email: string };
+
+export interface AuthCompleted {
+  outcome: 'authenticated';
+  tokens: AuthTokens;
+}
+
+export interface MfaRequired {
+  outcome: 'mfa_required';
+  challengeId: string;
+  factors: MfaFactor[];
+  expiresIn: number;
+}
+
+export type AuthenticationResult = AuthCompleted | MfaRequired;
+
+export interface RegistrationStarted {
+  registrationId: string;
+  expiresIn: number;
+}
+
+export interface RegistrationVerified {
+  verified: true;
+}
+
+export const authErrorCodes = [
+  apiStatuses.accountNotFound,
+  apiStatuses.invalidCredentials,
+  apiStatuses.registrationExpired,
+  apiStatuses.registrationUnverified,
+  apiStatuses.usernameUnavailable,
+] as const;
+export type AuthErrorCode = (typeof authErrorCodes)[number];
 
 export interface WorkspaceSummary {
   id: number;

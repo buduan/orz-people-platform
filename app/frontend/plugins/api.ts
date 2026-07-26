@@ -5,7 +5,7 @@ export default defineNuxtPlugin(() => {
   const authStore = useAuthStore();
 
   const api = createApiClient({
-    baseURL: config.public.apiBase,
+    baseURL: config.public.apiOrigin,
     getAccessToken: () => authStore.accessToken,
     getRefreshToken: () => authStore.refreshToken,
     onAccessTokenExpired: () => authStore.onAccessTokenExpired(),

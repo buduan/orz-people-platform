@@ -1,4 +1,9 @@
-import type { ApiErrorResponse, ApiResponse, ApiStatus } from '@orz-people-platform/types';
+import {
+  apiStatuses,
+  type ApiErrorResponse,
+  type ApiResponse,
+  type ApiStatus,
+} from '@orz-people-platform/types';
 
 /**
  * 鉴权模式：
@@ -17,11 +22,11 @@ export type ApiRequestOptions = Omit<NonNullable<Parameters<typeof $fetch>[1]>, 
   auth?: AuthMode;
 };
 
-/** 结构化 API 错误，携带 HTTP 状态码和后端业务错误码。 */
+/** 结构化 API 错误，分别携带 HTTP 状态码和响应体业务状态码。 */
 export class ApiError extends Error {
   public constructor(
-    public readonly status: number,
-    public readonly code: ApiStatus,
+    public readonly httpStatus: number,
+    public readonly status: ApiStatus,
     message: string,
   ) {
     super(message);
@@ -40,18 +45,18 @@ export function toApiError(error: unknown): ApiError {
     message?: string;
   };
 
-  const status = fetchError.statusCode ?? fetchError.status ?? 0;
+  const httpStatus = fetchError.statusCode ?? fetchError.status ?? 0;
   const body = fetchError.data;
 
   if (body?.message) {
     return new ApiError(
-      status,
+      httpStatus,
       body.status,
       body.message,
     );
   }
 
-  return new ApiError(status, 'unknown', fetchError.message ?? 'Unknown error');
+  return new ApiError(httpStatus, apiStatuses.unknown, fetchError.message ?? 'Unknown error');
 }
 
 /** API 客户端配置 */
@@ -80,7 +85,7 @@ export function createApiClient(options: ApiClientOptions) {
           body.message,
         );
       }
-      throw new ApiError(response.status, 'unknown', `HTTP ${response.status}`);
+      throw new ApiError(response.status, apiStatuses.unknown, `HTTP ${response.status}`);
     },
   });
 
@@ -111,17 +116,34 @@ export function createApiClient(options: ApiClientOptions) {
     }
 
     try {
-      const res = await raw<ApiResponse<T>>(url, {
+      const response = await raw.raw<ApiResponse<T>>(url, {
         ...rest,
         headers: finalHeaders,
       });
-      return res.data;
+      // ofetch exposes the parsed response body through its `_data` field.
+      // eslint-disable-next-line no-underscore-dangle
+      const envelope = response._data;
+      if (!envelope) {
+        throw new ApiError(
+          response.status,
+          apiStatuses.unknown,
+          'Invalid API response',
+        );
+      }
+      if (envelope.status !== apiStatuses.success) {
+        throw new ApiError(
+          response.status,
+          envelope.status,
+          envelope.message ?? 'Request failed',
+        );
+      }
+      return envelope.data;
     } catch (error) {
       const apiError = toApiError(error);
 
       // 预留：Access Token 过期处理（401 且使用的是 access 模式）
       // 待后端确认 JWT 携带的信息后，可在此处实现更精细的过期判断
-      if (apiError.status === 401 && auth === 'access') {
+      if (apiError.httpStatus === 401 && auth === 'access') {
         options.onAccessTokenExpired();
       }
 
@@ -137,26 +159,38 @@ export function createApiClient(options: ApiClientOptions) {
     /** POST 请求 */
     post<T>(
       url: string,
-      body?: Record<string, unknown> | unknown[],
+      body?: unknown,
       opts?: ApiRequestOptions,
     ): Promise<T> {
-      return request<T>(url, { ...opts, method: 'POST', body });
+      return request<T>(url, {
+        ...opts,
+        method: 'POST',
+        body: body as NonNullable<ApiRequestOptions['body']>,
+      });
     },
     /** PATCH 请求 */
     patch<T>(
       url: string,
-      body?: Record<string, unknown> | unknown[],
+      body?: unknown,
       opts?: ApiRequestOptions,
     ): Promise<T> {
-      return request<T>(url, { ...opts, method: 'PATCH', body });
+      return request<T>(url, {
+        ...opts,
+        method: 'PATCH',
+        body: body as NonNullable<ApiRequestOptions['body']>,
+      });
     },
     /** PUT 请求 */
     put<T>(
       url: string,
-      body?: Record<string, unknown> | unknown[],
+      body?: unknown,
       opts?: ApiRequestOptions,
     ): Promise<T> {
-      return request<T>(url, { ...opts, method: 'PUT', body });
+      return request<T>(url, {
+        ...opts,
+        method: 'PUT',
+        body: body as NonNullable<ApiRequestOptions['body']>,
+      });
     },
     /** DELETE 请求 */
     delete<T>(url: string, opts?: ApiRequestOptions): Promise<T> {

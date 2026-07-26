@@ -199,6 +199,12 @@ importers:
       '@iconify-json/solar':
         specifier: ^1.2.5
         version: 1.2.5
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@22.20.1)(vite@7.3.6(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(yaml@2.9.0))
+      vue:
+        specifier: 3.5.40
+        version: 3.5.40(typescript@6.0.3)
 
   packages/types: {}
 
