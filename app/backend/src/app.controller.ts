@@ -1,9 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import type { ApiResponse } from '@orz-people-platform/types';
-
 import { AppService } from './app.service';
+import { Public } from './authorization/authorization.decorators';
 
 @Controller()
 @ApiTags('System')
@@ -11,13 +10,15 @@ export class AppController {
   public constructor(private readonly appService: AppService) {}
 
   @Get('health')
+  @Public()
   @ApiOperation({ summary: 'Check service health' })
   @ApiOkResponse({
     description: 'The service is available.',
     schema: {
       type: 'object',
-      required: ['data', 'timestamp'],
+      required: ['status', 'data', 'timestamp'],
       properties: {
+        status: { type: 'integer', example: 200 },
         data: {
           type: 'object',
           required: ['service', 'status'],
@@ -30,7 +31,7 @@ export class AppController {
       },
     },
   })
-  public getHealth(): ApiResponse<{ service: string; status: string }> {
+  public getHealth(): { service: string; status: string } {
     return this.appService.getHealth();
   }
 }

@@ -10,18 +10,25 @@
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev --schema prisma/schema.prisma",
     "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema prisma/schema.prisma",
+    "test": "vitest run",
     "typecheck": "pnpm prisma:generate && pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && tsc --noEmit -p tsconfig.build.json"
   },
   "dependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "catalog:",
+    "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "catalog:",
     "@nestjs/swagger": "^11.4.6",
     "@orz-people-platform/types": "workspace:*",
     "@orz-people-platform/utils": "workspace:*",
     "@prisma/client": "^6.19.0",
+    "@simplewebauthn/server": "^13.3.2",
+    "argon2": "^0.45.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "ioredis": "^5.6.1",
+    "otpauth": "^9.5.1",
     "prisma": "^6.19.0",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:"
@@ -30,6 +37,7 @@
     "@nestjs/cli": "catalog:",
     "@nestjs/schematics": "catalog:",
     "dotenv-cli": "^8.0.0",
-    "typescript": "^6.0.0"
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.10"
   }
 }

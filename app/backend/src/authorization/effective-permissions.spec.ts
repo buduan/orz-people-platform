@@ -1,0 +1,86 @@
+import { ConflictException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import {
+  describe, expect, it, vi,
+} from 'vitest';
+
+import { permissionKeys, workspacePermissionKeys } from '@orz-people-platform/types';
+
+import { AuthorizationService } from './authorization.service';
+import { resolveEffectivePermissions } from './effective-permissions';
+
+describe('effective permission precedence', () => {
+  it('unions roles, adds direct allow and applies direct deny last', () => {
+    expect(resolveEffectivePermissions({
+      directPermissions: [
+        { effect: 'allow', permissionKey: 'audit.read' },
+        { effect: 'deny', permissionKey: 'role.read' },
+      ],
+      isSystemAdmin: false,
+      isWorkspaceAdmin: false,
+      rolePermissionKeys: ['role.read', 'user.read'],
+    })).toEqual(['audit.read', 'user.read']);
+  });
+
+  it('does not let ordinary deny restrict administrator authority', () => {
+    expect(resolveEffectivePermissions({
+      directPermissions: [{ effect: 'deny', permissionKey: 'user.read' }],
+      isSystemAdmin: true,
+      isWorkspaceAdmin: false,
+      rolePermissionKeys: [],
+    })).toEqual([...permissionKeys].sort());
+    expect(resolveEffectivePermissions({
+      directPermissions: [{ effect: 'deny', permissionKey: 'user.read' }],
+      isSystemAdmin: false,
+      isWorkspaceAdmin: true,
+      rolePermissionKeys: [],
+    })).toEqual(['workspace_admin', ...workspacePermissionKeys].sort());
+  });
+});
+
+describe('administrator boundaries', () => {
+  it('rejects concurrent attempts that each observe the last active administrator', async () => {
+    const transaction = vi.fn(async (
+      callback: (client: unknown) => Promise<void>,
+      options: unknown,
+    ) => {
+      expect(options).toEqual({ isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      await callback({
+        systemAdministrator: {
+          findUnique: vi.fn().mockResolvedValue({ user: { status: 'active' } }),
+          count: vi.fn().mockResolvedValue(1),
+          delete: vi.fn(),
+        },
+        auditLog: { create: vi.fn() },
+      });
+    });
+    const prisma = {
+      $transaction: transaction,
+      auditLog: { create: vi.fn() },
+    };
+    const reauthentication = { verify: vi.fn().mockResolvedValue(undefined) };
+    const workspaces = { assertDefault: vi.fn() };
+    const service = new AuthorizationService(
+      prisma as never,
+      reauthentication as never,
+      workspaces as never,
+    );
+
+    const results = await Promise.allSettled([
+      service.revokeSystemAdministrator('admin-1', 'admin-1', { password: 'Valid123!' }),
+      service.revokeSystemAdministrator('admin-1', 'admin-1', { password: 'Valid123!' }),
+    ]);
+
+    expect(results.every((result) => (
+      result.status === 'rejected' && result.reason instanceof ConflictException
+    ))).toBe(true);
+    expect(transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects reserved administrator labels in ordinary grants', () => {
+    const service = new AuthorizationService({} as never, {} as never, {} as never);
+    expect(() => service.assertGrantKeys(['system_admin'])).toThrow();
+    expect(() => service.assertGrantKeys(['workspace_admin'])).toThrow();
+    expect(() => service.assertGrantKeys(['not.registered'])).toThrow();
+  });
+});

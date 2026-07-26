@@ -9,7 +9,224 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String     @id @default(cuid())
+  email               String     @unique @db.VarChar(320)
+  username            String     @unique @db.VarChar(64)
+  name                String     @db.VarChar(128)
+  nickname            String     @db.VarChar(128)
+  avatarUrl           String?
+  phone               String?    @unique @db.VarChar(16)
+  emailVerifiedAt     DateTime?
+  phoneVerifiedAt     DateTime?
+  passwordHash        String?
+  passwordUpdatedAt   DateTime?
+  status              UserStatus @default(pending)
+  tokenVersion        Int        @default(1)
+  emailMfaEnabled     Boolean    @default(false)
+  smsMfaEnabled       Boolean    @default(false)
+  totpSecretEncrypted String?
+  totpEnabledAt       DateTime?
+  totpLastUsedStep    BigInt?
+  deletedAt           DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  passkeys                 PasskeyCredential[]
+  systemAdministrator      SystemAdministrator?  @relation("SystemAdministratorUser")
+  systemAdministratorsMade SystemAdministrator[] @relation("SystemAdministratorGranter")
+  ownedWorkspaces          Workspace[]           @relation("WorkspaceOwner")
+  memberships              WorkspaceMember[]     @relation("WorkspaceMemberUser")
+  membershipsInvited       WorkspaceMember[]     @relation("WorkspaceMemberInviter")
+  memberRolesAssigned      MemberRole[]          @relation("MemberRoleAssigner")
+  permissionsGranted       MemberPermission[]    @relation("MemberPermissionGranter")
+  auditLogs                AuditLog[]            @relation("AuditActor")
+
+  @@index([status])
+}
+
+enum UserStatus {
+  pending
+  active
+  disabled
+}
+
+enum WorkspaceStatus {
+  active
+  disabled
+}
+
+enum MemberStatus {
+  pending
+  active
+  suspended
+  removed
+}
+
+enum PermissionEffect {
+  allow
+  deny
+}
+
+model PasskeyCredential {
+  id           String   @id @default(cuid())
+  credentialId String   @unique
+  userId       String
+  publicKey    Bytes
+  counter      BigInt   @default(0)
+  transports   String[]
+  deviceType   String?
+  backedUp     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SystemAdministrator {
+  userId          String   @id
+  grantedByUserId String?
+  grantedAt       DateTime @default(now())
+
+  user      User  @relation("SystemAdministratorUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("SystemAdministratorGranter", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+}
+
+model Workspace {
+  id          Int             @id @default(autoincrement())
+  name        String          @db.VarChar(128)
+  slug        String          @unique @db.VarChar(64)
+  ownerUserId String
+  status      WorkspaceStatus @default(active)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  owner     User              @relation("WorkspaceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  members   WorkspaceMember[]
+  memberTypes WorkspaceMemberType[]
+  roles     Role[]
+  auditLogs AuditLog[]
+
+  @@index([ownerUserId])
+  @@index([status])
+}
+
+model WorkspaceMember {
+  id               String       @id @default(cuid())
+  workspaceId      Int
+  userId           String
+  memberTypeId     String
+  status           MemberStatus @default(pending)
+  isWorkspaceAdmin Boolean      @default(false)
+  invitedByUserId  String?
+  joinedAt         DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberType       WorkspaceMemberType @relation(fields: [memberTypeId], references: [id], onDelete: Restrict)
+  user              User               @relation("WorkspaceMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy         User?              @relation("WorkspaceMemberInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  roles             MemberRole[]
+  directPermissions MemberPermission[]
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId, status])
+  @@index([userId])
+  @@index([memberTypeId])
+}
+
+model WorkspaceMemberType {
+  id          String   @id @default(cuid())
+  workspaceId Int
+  name        String   @db.VarChar(128)
+  slug        String   @db.VarChar(64)
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members   WorkspaceMember[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  workspaceId Int
+  code        String   @db.VarChar(64)
+  name        String   @db.VarChar(128)
+  description String?
+  isSystem    Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     MemberRole[]
+  permissions RolePermission[]
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, isDefault])
+}
+
+model MemberRole {
+  memberId         String
+  roleId           String
+  assignedByUserId String
+  assignedAt       DateTime @default(now())
+
+  member     WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role       Role            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedBy User            @relation("MemberRoleAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([memberId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId        String
+  permissionKey String @db.VarChar(128)
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+}
+
+model MemberPermission {
+  memberId        String
+  permissionKey   String           @db.VarChar(128)
+  effect          PermissionEffect
+  grantedByUserId String
+  grantedAt       DateTime         @default(now())
+
+  member    WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  grantedBy User            @relation("MemberPermissionGranter", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([memberId, permissionKey])
+}
+
+model AuditLog {
+  id           BigInt   @id @default(autoincrement())
+  workspaceId  Int?
+  actorUserId  String?
+  actorType    String   @db.VarChar(32)
+  action       String   @db.VarChar(128)
+  resourceType String   @db.VarChar(64)
+  resourceId   String?  @db.VarChar(128)
+  result       String   @db.VarChar(32)
+  requestId    String?  @db.VarChar(64)
+  ip           String?  @db.VarChar(64)
+  userAgent    String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  actor     User?      @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
 }

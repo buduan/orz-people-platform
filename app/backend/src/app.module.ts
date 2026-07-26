@@ -7,6 +7,12 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { AuditModule } from './audit/audit.module';
+import { AuthModule } from './auth/auth.module';
+import { AuthorizationModule } from './authorization/authorization.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { UsersModule } from './users/users.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
 
 @Module({
   imports: [
@@ -18,6 +24,12 @@ import { RedisModule } from './redis/redis.module';
     }),
     PrismaModule,
     RedisModule,
+    NotificationsModule,
+    AuditModule,
+    UsersModule,
+    WorkspacesModule,
+    AuthModule,
+    AuthorizationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

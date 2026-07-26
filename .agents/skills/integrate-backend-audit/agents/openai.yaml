@@ -1,0 +1,4 @@
+interface:
+  display_name: "Integrate Backend Audit"
+  short_description: "Add consistent audit logging to NestJS backend changes"
+  default_prompt: "Use $integrate-backend-audit to add audit logging to this backend change."

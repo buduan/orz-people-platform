@@ -21,6 +21,8 @@ export default [
       '**/.nuxt/**',
       '**/.output/**',
       '**/node_modules/**',
+      '.agents/**',
+      '.codex/**',
       'scripts/**/*.mjs',
       'eslint.config.mjs',
     ],
@@ -68,6 +70,7 @@ export default [
       'vue/multi-word-component-names': 'off',
     },
     settings: {
+      'import/core-modules': ['#imports'],
       'import/resolver': {
         typescript: {
           project: './tsconfig.eslint.json',

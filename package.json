@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=1 run build",
+    "bootstrap:admin": "pnpm --filter @orz-people-platform/backend build && pnpm --filter @orz-people-platform/backend exec dotenv -e ../../.env -- node dist/bootstrap-admin.js",
     "dev": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm -r --parallel --filter './app/*' run dev",
     "dev:backend": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm --filter @orz-people-platform/backend dev",
     "dev:frontend": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm --filter @orz-people-platform/frontend dev",
