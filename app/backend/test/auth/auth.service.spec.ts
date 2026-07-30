@@ -5,7 +5,7 @@ import { BadRequestException, ConflictException, HttpStatus } from '@nestjs/comm
 
 import { apiStatuses } from '@orz-people-platform/types';
 
-import { AuthService } from './auth.service';
+import { AuthService } from '../../src/auth/auth.service';
 
 describe('login option discovery', () => {
   it('returns HTTP 400 with account_not_found for an unknown username', async () => {

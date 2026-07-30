@@ -1,19 +1,6 @@
-/** A value that can be represented in JSON. */
-export type JsonValue =
-  | boolean
-  | null
-  | number
-  | string
-  | JsonValue[]
-  | JsonSchemaObject;
+import type { JsonSchema, JsonSchemaObject } from '@orz-people-platform/types';
 
-/** A JSON object that can be used as a JSON Schema. */
-export interface JsonSchemaObject {
-  [keyword: string]: JsonValue;
-}
-
-/** A JSON Schema document. Boolean schemas are valid according to the specification. */
-export type JsonSchema = boolean | JsonSchemaObject;
+export type { JsonSchema, JsonSchemaObject, JsonValue } from '@orz-people-platform/types';
 
 /**
  * Parses a JSON Schema document from a JSON string.

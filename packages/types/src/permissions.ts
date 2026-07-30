@@ -15,6 +15,12 @@ export const permissionRegistry = {
   'role.assign': 'workspace',
   'permission.grant': 'workspace',
   'audit.read': 'workspace',
+  'dataset.create': 'workspace',
+  'dataset.read_all': 'workspace',
+  'dataset.manage_all': 'workspace',
+  'form.manage_all': 'workspace',
+  'join_request.review': 'workspace',
+  'activity.manage': 'workspace',
 } as const;
 
 export type PermissionKey = keyof typeof permissionRegistry;

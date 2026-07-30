@@ -4,7 +4,7 @@ import {
   describe, expect, it, vi,
 } from 'vitest';
 
-import { UsersService } from './users.service';
+import { UsersService } from '../../src/users/users.service';
 
 describe('normalized identity uniqueness', () => {
   it('maps PostgreSQL unique-constraint conflicts to a public conflict error', async () => {
