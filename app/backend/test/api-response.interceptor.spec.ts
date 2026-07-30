@@ -11,8 +11,8 @@ import {
   vi,
 } from 'vitest';
 
-import { ApiResponseInterceptor } from './api-response.interceptor';
-import { HttpExceptionFilter } from './http-exception.filter';
+import { ApiResponseInterceptor } from '../src/api-response.interceptor';
+import { HttpExceptionFilter } from '../src/http-exception.filter';
 
 describe('HTTP response envelope', () => {
   it('wraps successful controller data with its HTTP status', async () => {

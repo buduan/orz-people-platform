@@ -9,13 +9,14 @@ import {
   vi,
 } from 'vitest';
 
-import { WorkspacesService } from './workspaces.service';
+import { WorkspacesService } from '../../src/workspaces/workspaces.service';
 
 describe('first-release Workspace boundary', () => {
   it('accepts Workspace 1 and rejects cross-Workspace access', () => {
     const service = new WorkspacesService(
       {} as never,
       { get: () => '1' } as never,
+      {} as never,
     );
 
     expect(() => service.assertDefault(1)).not.toThrow();
@@ -30,7 +31,11 @@ describe('Workspace member types', () => {
         findUnique: vi.fn().mockResolvedValue({ id: 'guest-1', workspaceId: 1, isSystem: true }),
       },
     };
-    const service = new WorkspacesService(prisma as never, { get: () => '1' } as never);
+    const service = new WorkspacesService(
+      prisma as never,
+      { get: () => '1' } as never,
+      {} as never,
+    );
 
     await expect(service.deleteMemberType(1, 'guest-1', 'admin-1')).rejects.toBeInstanceOf(
       ConflictException,
@@ -45,7 +50,11 @@ describe('Workspace member types', () => {
     const prisma = {
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
     };
-    const service = new WorkspacesService(prisma as never, { get: () => '1' } as never);
+    const service = new WorkspacesService(
+      prisma as never,
+      { get: () => '1' } as never,
+      {} as never,
+    );
 
     await expect(service.updateMember(1, 'member-1', { memberTypeId: 'type-2' }, 'admin-1'))
       .rejects.toThrow('Member type not found');

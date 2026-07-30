@@ -32,14 +32,28 @@ model User {
   updatedAt           DateTime   @updatedAt
 
   passkeys                 PasskeyCredential[]
-  systemAdministrator      SystemAdministrator?  @relation("SystemAdministratorUser")
-  systemAdministratorsMade SystemAdministrator[] @relation("SystemAdministratorGranter")
-  ownedWorkspaces          Workspace[]           @relation("WorkspaceOwner")
-  memberships              WorkspaceMember[]     @relation("WorkspaceMemberUser")
-  membershipsInvited       WorkspaceMember[]     @relation("WorkspaceMemberInviter")
-  memberRolesAssigned      MemberRole[]          @relation("MemberRoleAssigner")
-  permissionsGranted       MemberPermission[]    @relation("MemberPermissionGranter")
-  auditLogs                AuditLog[]            @relation("AuditActor")
+  systemAdministrator      SystemAdministrator?   @relation("SystemAdministratorUser")
+  systemAdministratorsMade SystemAdministrator[]  @relation("SystemAdministratorGranter")
+  ownedWorkspaces          Workspace[]            @relation("WorkspaceOwner")
+  memberships              WorkspaceMember[]      @relation("WorkspaceMemberUser")
+  membershipsInvited       WorkspaceMember[]      @relation("WorkspaceMemberInviter")
+  memberRolesAssigned      MemberRole[]           @relation("MemberRoleAssigner")
+  permissionsGranted       MemberPermission[]     @relation("MemberPermissionGranter")
+  auditLogs                AuditLog[]             @relation("AuditActor")
+  datasetsCreated          Dataset[]              @relation("DatasetCreator")
+  datasetCollaboratorsMade DatasetCollaborator[]  @relation("DatasetCollaboratorAssigner")
+  datasetRowsCreated       DatasetRow[]           @relation("DatasetRowCreator")
+  datasetRowsUpdated       DatasetRow[]           @relation("DatasetRowUpdater")
+  datasetRowSubjects       DatasetRowSubject[]
+  datasetVersionsCreated   DatasetVersion[]       @relation("DatasetVersionCreator")
+  datasetRowVersionsActed  DatasetRowVersion[]    @relation("DatasetRowVersionActor")
+  formsCreated             Form[]                 @relation("FormCreator")
+  formVersionsCreated      FormVersion[]          @relation("FormVersionCreator")
+  formVersionsPublished    FormVersion[]          @relation("FormVersionPublisher")
+  formSubmissions          FormSubmission[]       @relation("FormSubmitter")
+  activitiesCreated        Activity[]             @relation("ActivityCreator")
+  joinRequestsDecided      JoinRequest[]          @relation("JoinRequestDecider")
+  activityRegistrations    ActivityRegistration[]
 
   @@index([status])
 }
@@ -102,11 +116,16 @@ model Workspace {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  owner     User              @relation("WorkspaceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  members   WorkspaceMember[]
-  memberTypes WorkspaceMemberType[]
-  roles     Role[]
-  auditLogs AuditLog[]
+  owner                 User                   @relation("WorkspaceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  members               WorkspaceMember[]
+  memberTypes           WorkspaceMemberType[]
+  roles                 Role[]
+  auditLogs             AuditLog[]
+  datasets              Dataset[]
+  membersDatasetBinding MembersDatasetBinding?
+  activities            Activity[]
+  forms                 Form[]
+  formSubmissions       FormSubmission[]
 
   @@index([ownerUserId])
   @@index([status])
@@ -124,14 +143,17 @@ model WorkspaceMember {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  memberType       WorkspaceMemberType @relation(fields: [memberTypeId], references: [id], onDelete: Restrict)
-  user              User               @relation("WorkspaceMemberUser", fields: [userId], references: [id], onDelete: Cascade)
-  invitedBy         User?              @relation("WorkspaceMemberInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
-  roles             MemberRole[]
-  directPermissions MemberPermission[]
+  workspace             Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberType            WorkspaceMemberType   @relation(fields: [memberTypeId], references: [id], onDelete: Restrict)
+  user                  User                  @relation("WorkspaceMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy             User?                 @relation("WorkspaceMemberInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  roles                 MemberRole[]
+  directPermissions     MemberPermission[]
+  datasetCollaborations DatasetCollaborator[]
+  memberProfileRow      MemberProfileRow?
 
   @@unique([workspaceId, userId])
+  @@unique([workspaceId, id])
   @@index([workspaceId, status])
   @@index([userId])
   @@index([memberTypeId])
@@ -146,8 +168,9 @@ model WorkspaceMemberType {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  members   WorkspaceMember[]
+  workspace            Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members              WorkspaceMember[]
+  approvedJoinRequests JoinRequest[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -229,4 +252,482 @@ model AuditLog {
   @@index([workspaceId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([action, createdAt])
+}
+
+enum DatasetType {
+  standard
+  members
+  join_requests
+  activity_registrations
+}
+
+enum DatasetStatus {
+  active
+  archived
+}
+
+enum DatasetSubjectMode {
+  none
+  single_per_user
+}
+
+enum DatasetCollaboratorRole {
+  owner
+  maintainer
+}
+
+enum DatasetFieldKind {
+  text
+  long_text
+  number
+  boolean
+  date
+  time
+  datetime
+  email
+  url
+  single_select
+  multi_select
+  json
+  relation
+}
+
+enum RelationCardinality {
+  one
+  many
+}
+
+enum DatasetRowVersionOperation {
+  create
+  update
+  delete
+  restore
+}
+
+enum JoinRequestStatus {
+  draft
+  submitted
+  approved
+  rejected
+  withdrawn
+}
+
+enum ActivityStatus {
+  draft
+  open
+  closed
+  archived
+}
+
+enum ActivityRegistrationStatus {
+  registered
+  waitlisted
+  cancelled
+}
+
+enum FormStatus {
+  active
+  closed
+  archived
+}
+
+enum FormVersionState {
+  draft
+  published
+  retired
+}
+
+enum FormSubmissionAccess {
+  anonymous_allowed
+  authentication_required
+}
+
+enum FormWriteMode {
+  create_row
+  update_subject_row
+}
+
+enum FormSubmissionOperation {
+  created
+  updated
+}
+
+model Dataset {
+  id              String             @id @default(cuid())
+  workspaceId     Int
+  name            String             @db.VarChar(128)
+  slug            String             @db.VarChar(64)
+  description     String?
+  type            DatasetType        @default(standard)
+  status          DatasetStatus      @default(active)
+  subjectMode     DatasetSubjectMode @default(none)
+  revision        Int                @default(1)
+  createdByUserId String
+  archivedAt      DateTime?          @db.Timestamptz(3)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(3)
+
+  workspace             Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  createdBy             User                   @relation("DatasetCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  collaborators         DatasetCollaborator[]
+  fields                DatasetField[]         @relation("DatasetFields")
+  relationTargetFields  DatasetField[]         @relation("DatasetFieldRelationTarget")
+  rows                  DatasetRow[]
+  rowSubjects           DatasetRowSubject[]
+  versions              DatasetVersion[]
+  membersBinding        MembersDatasetBinding?
+  memberProfileRows     MemberProfileRow[]
+  joinRequests          JoinRequest[]
+  registrationActivity  Activity?              @relation("ActivityRegistrationDataset")
+  activityRegistrations ActivityRegistration[]
+  forms                 Form[]
+  formSubmissions       FormSubmission[]
+
+  @@unique([workspaceId, slug])
+  @@unique([workspaceId, id])
+  @@index([workspaceId, type, status])
+  @@index([createdByUserId])
+}
+
+model DatasetCollaborator {
+  workspaceId       Int
+  datasetId         String
+  workspaceMemberId String
+  role              DatasetCollaboratorRole
+  assignedByUserId  String
+  createdAt         DateTime                @default(now()) @db.Timestamptz(3)
+
+  dataset    Dataset         @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Cascade)
+  member     WorkspaceMember @relation(fields: [workspaceId, workspaceMemberId], references: [workspaceId, id], onDelete: Cascade)
+  assignedBy User            @relation("DatasetCollaboratorAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([datasetId, workspaceMemberId])
+  @@index([workspaceId, role])
+  @@index([workspaceMemberId])
+  @@index([assignedByUserId])
+}
+
+model DatasetField {
+  id                      String               @id @default(cuid())
+  workspaceId             Int
+  datasetId               String
+  key                     String               @db.VarChar(64)
+  name                    String               @db.VarChar(128)
+  description             String?
+  kind                    DatasetFieldKind
+  valueSchema             Json
+  config                  Json                 @default("{}")
+  required                Boolean              @default(false)
+  isSystemManaged         Boolean              @default(false)
+  systemKey               String?              @db.VarChar(64)
+  relationTargetDatasetId String?
+  relationCardinality     RelationCardinality?
+  position                Int                  @default(0)
+  revision                Int                  @default(1)
+  archivedAt              DateTime?            @db.Timestamptz(3)
+  createdAt               DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime             @updatedAt @db.Timestamptz(3)
+
+  dataset        Dataset           @relation("DatasetFields", fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Cascade)
+  relationTarget Dataset?          @relation("DatasetFieldRelationTarget", fields: [workspaceId, relationTargetDatasetId], references: [workspaceId, id], onDelete: Restrict)
+  relations      DatasetRelation[]
+
+  @@unique([datasetId, key])
+  @@unique([datasetId, systemKey])
+  @@unique([workspaceId, datasetId, id])
+  @@index([workspaceId, datasetId, position])
+  @@index([relationTargetDatasetId])
+}
+
+model DatasetRow {
+  id              String    @id @default(cuid())
+  workspaceId     Int
+  datasetId       String
+  values          Json      @default("{}")
+  revision        Int       @default(1)
+  createdByUserId String?
+  updatedByUserId String?
+  deletedAt       DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+
+  dataset              Dataset               @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Cascade)
+  createdBy            User?                 @relation("DatasetRowCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy            User?                 @relation("DatasetRowUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  sourceRelations      DatasetRelation[]     @relation("DatasetRelationSource")
+  targetRelations      DatasetRelation[]     @relation("DatasetRelationTarget")
+  subject              DatasetRowSubject?
+  versions             DatasetRowVersion[]
+  memberProfile        MemberProfileRow?
+  joinRequest          JoinRequest?
+  activityRegistration ActivityRegistration?
+  formSubmissions      FormSubmission[]
+
+  @@unique([workspaceId, datasetId, id])
+  @@index([workspaceId, datasetId, deletedAt, createdAt])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+}
+
+model DatasetRelation {
+  id              String   @id @default(cuid())
+  workspaceId     Int
+  sourceDatasetId String
+  sourceRowId     String
+  fieldId         String
+  targetDatasetId String
+  targetRowId     String
+  position        Int      @default(0)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  sourceRow DatasetRow   @relation("DatasetRelationSource", fields: [workspaceId, sourceDatasetId, sourceRowId], references: [workspaceId, datasetId, id], onDelete: Cascade)
+  targetRow DatasetRow   @relation("DatasetRelationTarget", fields: [workspaceId, targetDatasetId, targetRowId], references: [workspaceId, datasetId, id], onDelete: Restrict)
+  field     DatasetField @relation(fields: [workspaceId, sourceDatasetId, fieldId], references: [workspaceId, datasetId, id], onDelete: Restrict)
+
+  @@unique([sourceRowId, fieldId, targetRowId])
+  @@index([workspaceId, targetDatasetId, targetRowId])
+  @@index([workspaceId, sourceDatasetId, sourceRowId, fieldId, position])
+}
+
+model DatasetRowSubject {
+  rowId       String   @id
+  workspaceId Int
+  datasetId   String
+  userId      String
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  row     DatasetRow @relation(fields: [workspaceId, datasetId, rowId], references: [workspaceId, datasetId, id], onDelete: Cascade)
+  dataset Dataset    @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Cascade)
+  user    User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([datasetId, userId])
+  @@unique([workspaceId, datasetId, rowId])
+  @@index([workspaceId, userId])
+}
+
+model DatasetVersion {
+  id               String   @id @default(cuid())
+  datasetId        String
+  version          Int
+  metadataSnapshot Json
+  fieldsSnapshot   Json
+  reason           String?
+  createdByUserId  String
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  dataset   Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("DatasetVersionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([datasetId, version])
+  @@index([createdByUserId])
+}
+
+model DatasetRowVersion {
+  id                String                     @id @default(cuid())
+  rowId             String
+  version           Int
+  operation         DatasetRowVersionOperation
+  valuesSnapshot    Json
+  relationsSnapshot Json
+  changedFieldIds   String[]
+  actorUserId       String?
+  createdAt         DateTime                   @default(now()) @db.Timestamptz(3)
+
+  row        DatasetRow      @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  actor      User?           @relation("DatasetRowVersionActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  submission FormSubmission?
+
+  @@unique([rowId, version])
+  @@index([actorUserId])
+}
+
+model MembersDatasetBinding {
+  workspaceId Int      @id
+  datasetId   String   @unique
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  dataset   Dataset   @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Restrict)
+
+  @@unique([workspaceId, datasetId])
+}
+
+model MemberProfileRow {
+  workspaceMemberId String   @id
+  workspaceId       Int
+  datasetId         String
+  rowId             String   @unique
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  member  WorkspaceMember @relation(fields: [workspaceId, workspaceMemberId], references: [workspaceId, id], onDelete: Restrict)
+  dataset Dataset         @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Restrict)
+  row     DatasetRow      @relation(fields: [workspaceId, datasetId, rowId], references: [workspaceId, datasetId, id], onDelete: Restrict)
+
+  @@unique([workspaceId, workspaceMemberId])
+  @@unique([workspaceId, datasetId, rowId])
+  @@index([workspaceId, datasetId])
+}
+
+model JoinRequest {
+  rowId                String            @id
+  workspaceId          Int
+  datasetId            String
+  status               JoinRequestStatus @default(draft)
+  decidedByUserId      String?
+  approvedMemberTypeId String?
+  submittedAt          DateTime?         @db.Timestamptz(3)
+  decidedAt            DateTime?         @db.Timestamptz(3)
+  decisionNote         String?
+  revision             Int               @default(1)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+
+  row                DatasetRow           @relation(fields: [workspaceId, datasetId, rowId], references: [workspaceId, datasetId, id], onDelete: Restrict)
+  dataset            Dataset              @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Restrict)
+  decidedBy          User?                @relation("JoinRequestDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  approvedMemberType WorkspaceMemberType? @relation(fields: [approvedMemberTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([workspaceId, datasetId, rowId])
+  @@index([workspaceId, datasetId, status, submittedAt])
+  @@index([decidedByUserId])
+  @@index([approvedMemberTypeId])
+}
+
+model Activity {
+  id                    String         @id @default(cuid())
+  workspaceId           Int
+  registrationDatasetId String         @unique
+  slug                  String         @db.VarChar(64)
+  nameI18n              Json
+  descriptionI18n       Json?
+  status                ActivityStatus @default(draft)
+  startsAt              DateTime?      @db.Timestamptz(3)
+  endsAt                DateTime?      @db.Timestamptz(3)
+  timezone              String?        @db.VarChar(64)
+  revision              Int            @default(1)
+  createdByUserId       String
+  createdAt             DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime       @updatedAt @db.Timestamptz(3)
+
+  workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  registrationDataset Dataset                @relation("ActivityRegistrationDataset", fields: [workspaceId, registrationDatasetId], references: [workspaceId, id], onDelete: Restrict)
+  createdBy           User                   @relation("ActivityCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  registrations       ActivityRegistration[]
+
+  @@unique([workspaceId, slug])
+  @@unique([workspaceId, id])
+  @@unique([workspaceId, registrationDatasetId])
+  @@index([workspaceId, status])
+  @@index([createdByUserId])
+}
+
+model ActivityRegistration {
+  rowId             String                     @id
+  workspaceId       Int
+  datasetId         String
+  activityId        String
+  participantUserId String?
+  status            ActivityRegistrationStatus @default(registered)
+  registeredAt      DateTime                   @default(now()) @db.Timestamptz(3)
+  cancelledAt       DateTime?                  @db.Timestamptz(3)
+  revision          Int                        @default(1)
+  updatedAt         DateTime                   @updatedAt @db.Timestamptz(3)
+
+  row         DatasetRow @relation(fields: [workspaceId, datasetId, rowId], references: [workspaceId, datasetId, id], onDelete: Restrict)
+  dataset     Dataset    @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Restrict)
+  activity    Activity   @relation(fields: [workspaceId, activityId], references: [workspaceId, id], onDelete: Restrict)
+  participant User?      @relation(fields: [participantUserId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, datasetId, rowId])
+  @@index([workspaceId, activityId, status, registeredAt])
+  @@index([participantUserId])
+}
+
+model Form {
+  id              String     @id @default(cuid())
+  workspaceId     Int
+  datasetId       String
+  slug            String     @db.VarChar(64)
+  status          FormStatus @default(active)
+  activeVersionId String?    @unique
+  revision        Int        @default(1)
+  createdByUserId String
+  createdAt       DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @db.Timestamptz(3)
+
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  dataset       Dataset          @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Restrict)
+  activeVersion FormVersion?     @relation("ActiveFormVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+  createdBy     User             @relation("FormCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  versions      FormVersion[]    @relation("FormVersions")
+  submissions   FormSubmission[]
+
+  @@unique([workspaceId, slug])
+  @@unique([workspaceId, id])
+  @@index([workspaceId, datasetId, status])
+  @@index([createdByUserId])
+}
+
+model FormVersion {
+  id                 String               @id @default(cuid())
+  formId             String
+  version            Int
+  state              FormVersionState     @default(draft)
+  defaultLocale      String               @db.VarChar(35)
+  nameI18n           Json
+  descriptionI18n    Json?
+  closingMessageI18n Json?
+  opensAt            DateTime?            @db.Timestamptz(3)
+  closesAt           DateTime?            @db.Timestamptz(3)
+  submissionAccess   FormSubmissionAccess @default(anonymous_allowed)
+  writeMode          FormWriteMode        @default(create_row)
+  schema             Json
+  schemaChecksum     String               @db.VarChar(64)
+  revision           Int                  @default(1)
+  createdByUserId    String
+  publishedByUserId  String?
+  publishedAt        DateTime?            @db.Timestamptz(3)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
+
+  form        Form             @relation("FormVersions", fields: [formId], references: [id], onDelete: Cascade)
+  activeFor   Form?            @relation("ActiveFormVersion")
+  createdBy   User             @relation("FormVersionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  publishedBy User?            @relation("FormVersionPublisher", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+  submissions FormSubmission[]
+
+  @@unique([formId, version])
+  @@index([formId, state])
+  @@index([createdByUserId])
+  @@index([publishedByUserId])
+}
+
+model FormSubmission {
+  id              String                  @id @default(cuid())
+  workspaceId     Int
+  formId          String
+  formVersionId   String
+  datasetId       String
+  rowId           String
+  rowVersionId    String                  @unique
+  submitterUserId String?
+  operation       FormSubmissionOperation
+  idempotencyKey  String?                 @db.VarChar(128)
+  payloadChecksum String?                 @db.VarChar(64)
+  submittedAt     DateTime                @default(now()) @db.Timestamptz(3)
+
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  form        Form              @relation(fields: [workspaceId, formId], references: [workspaceId, id], onDelete: Restrict)
+  formVersion FormVersion       @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  dataset     Dataset           @relation(fields: [workspaceId, datasetId], references: [workspaceId, id], onDelete: Restrict)
+  row         DatasetRow        @relation(fields: [workspaceId, datasetId, rowId], references: [workspaceId, datasetId, id], onDelete: Restrict)
+  rowVersion  DatasetRowVersion @relation(fields: [rowVersionId], references: [id], onDelete: Restrict)
+  submitter   User?             @relation("FormSubmitter", fields: [submitterUserId], references: [id], onDelete: SetNull)
+
+  @@unique([formId, idempotencyKey])
+  @@index([workspaceId, datasetId, submittedAt])
+  @@index([formVersionId])
+  @@index([rowId])
+  @@index([submitterUserId])
 }

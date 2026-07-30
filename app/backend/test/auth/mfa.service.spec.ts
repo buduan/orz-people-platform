@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import * as OTPAuth from 'otpauth';
 
-import { MfaService } from './mfa.service';
+import { MfaService } from '../../src/auth/mfa.service';
 
 class FakeMfaRedis {
   public readonly values = new Map<string, string>();

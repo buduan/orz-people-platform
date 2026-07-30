@@ -2,7 +2,7 @@ import {
   describe, expect, it, vi,
 } from 'vitest';
 
-import { AuthService } from './auth.service';
+import { AuthService } from '../../src/auth/auth.service';
 
 describe('password login identifiers', () => {
   it('normalizes email and username and filters phone lookup to verified bindings', async () => {

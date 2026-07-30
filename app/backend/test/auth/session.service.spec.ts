@@ -3,7 +3,7 @@ import {
   describe, expect, it, vi,
 } from 'vitest';
 
-import { SessionService } from './session.service';
+import { SessionService } from '../../src/auth/session.service';
 
 class FakeSessionMulti {
   public constructor(private readonly redis: FakeSessionRedis) {}

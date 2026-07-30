@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { MemberStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { MembersSyncService } from '../datasets/members-sync.service';
 
 @Injectable()
 export class WorkspacesService {
@@ -12,7 +13,11 @@ export class WorkspacesService {
 
   private static readonly systemMemberTypeSlugs = ['member', 'guest'];
 
-  public constructor(private readonly prisma: PrismaService, config: ConfigService) {
+  public constructor(
+    private readonly prisma: PrismaService,
+    config: ConfigService,
+    private readonly membersSync: MembersSyncService,
+  ) {
     const configuredId = Number(config.get('DEFAULT_WORKSPACE_ID') ?? WorkspacesService.DEFAULT_ID);
     if (configuredId !== WorkspacesService.DEFAULT_ID) {
       throw new Error('DEFAULT_WORKSPACE_ID must be 1 for the first release');
@@ -79,6 +84,9 @@ export class WorkspacesService {
         throw new BadRequestException('Workspace owner must remain an active Workspace administrator');
       }
       const updated = await tx.workspaceMember.update({ where: { id: memberId }, data });
+      if (data.memberTypeId !== undefined || data.status !== undefined) {
+        await this.membersSync.synchronize(tx, workspaceId, memberId, actorUserId);
+      }
       await tx.auditLog.create({
         data: {
           action: 'workspace.member.update',
