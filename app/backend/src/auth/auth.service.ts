@@ -17,6 +17,7 @@ import { OtpService } from './otp.service';
 import { SessionService } from './session.service';
 import { MfaService, type MfaRequired } from './mfa.service';
 import { ReauthenticationService } from './reauthentication.service';
+import { ensureWorkspaceMemberSampleData } from '../workspaces/workspace-member-sample-data';
 
 @Injectable()
 export class AuthService {
@@ -44,7 +45,7 @@ export class AuthService {
         where: { email },
         data: { emailVerifiedAt: new Date(), status: UserStatus.active },
       });
-      await tx.workspaceMember.update({
+      const member = await tx.workspaceMember.update({
         where: {
           workspaceId_userId: {
             workspaceId: WorkspacesService.DEFAULT_ID,
@@ -53,6 +54,11 @@ export class AuthService {
         },
         data: { status: MemberStatus.active, joinedAt: new Date() },
       });
+      const sampleData = await ensureWorkspaceMemberSampleData(tx, {
+        workspaceId: WorkspacesService.DEFAULT_ID,
+        workspaceMemberId: member.id,
+        userId: user.id,
+      });
       await this.audit.record({
         action: 'user.registration.confirm',
         actorType: 'system',
@@ -60,6 +66,13 @@ export class AuthService {
         resourceId: user.id,
         result: 'success',
         workspaceId: WorkspacesService.DEFAULT_ID,
+        metadata: {
+          sampleData: {
+            created: sampleData.created,
+            datasetId: sampleData.datasetId,
+            formId: sampleData.formId,
+          },
+        },
       }, tx);
     });
   }

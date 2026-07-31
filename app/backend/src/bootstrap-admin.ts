@@ -5,6 +5,7 @@ import { PrismaClient, UserStatus, MemberStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 import { normalizeEmail, normalizeUsername, validatePassword } from '@orz-people-platform/utils';
+import { ensureWorkspaceMemberSampleData } from './workspaces/workspace-member-sample-data';
 
 async function hiddenQuestion(label: string): Promise<string> {
   if (!stdin.isTTY || !stdout.isTTY) {
@@ -127,6 +128,11 @@ async function main(): Promise<void> {
         data: { memberId: member.id, roleId: role.id, assignedByUserId: user.id },
       });
       await tx.systemAdministrator.create({ data: { userId: user.id } });
+      const sampleData = await ensureWorkspaceMemberSampleData(tx, {
+        workspaceId: workspace.id,
+        workspaceMemberId: member.id,
+        userId: user.id,
+      });
       await tx.auditLog.create({
         data: {
           workspaceId: workspace.id,
@@ -136,6 +142,13 @@ async function main(): Promise<void> {
           resourceType: 'workspace',
           resourceId: String(workspace.id),
           result: 'success',
+          metadata: {
+            sampleData: {
+              created: sampleData.created,
+              datasetId: sampleData.datasetId,
+              formId: sampleData.formId,
+            },
+          },
         },
       });
     });
