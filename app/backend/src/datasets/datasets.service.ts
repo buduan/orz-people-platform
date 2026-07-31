@@ -18,6 +18,7 @@ import type { AuthenticatedActor } from '@orz-people-platform/types';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { createDatasetDefinitionVersion } from './dataset-definition-version';
 import { DatasetSchemaService } from './dataset-schema.service';
 import type {
   AddDatasetCollaboratorInput,
@@ -575,48 +576,7 @@ export class DatasetsService {
     actorUserId: string,
     reason: string,
   ): Promise<void> {
-    const dataset = await tx.dataset.findUniqueOrThrow({
-      where: { id: datasetId },
-      include: { fields: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
-    });
-    // 快照 Dataset 核心元数据。
-    const metadataSnapshot: Prisma.InputJsonObject = {
-      name: dataset.name,
-      slug: dataset.slug,
-      description: dataset.description,
-      type: dataset.type,
-      status: dataset.status,
-      subjectMode: dataset.subjectMode,
-      revision: dataset.revision,
-    };
-    // 快照每个字段在当前版本的定义。
-    const fieldsSnapshot = dataset.fields.map((field) => ({
-      id: field.id,
-      key: field.key,
-      name: field.name,
-      description: field.description,
-      kind: field.kind,
-      valueSchema: field.valueSchema,
-      config: field.config,
-      required: field.required,
-      isSystemManaged: field.isSystemManaged,
-      systemKey: field.systemKey,
-      relationTargetDatasetId: field.relationTargetDatasetId,
-      relationCardinality: field.relationCardinality,
-      position: field.position,
-      revision: field.revision,
-      archivedAt: field.archivedAt?.toISOString() ?? null,
-    })) as Prisma.InputJsonArray;
-    await tx.datasetVersion.create({
-      data: {
-        datasetId,
-        version: dataset.revision,
-        metadataSnapshot,
-        fieldsSnapshot,
-        reason,
-        createdByUserId: actorUserId,
-      },
-    });
+    await createDatasetDefinitionVersion(tx, datasetId, actorUserId, reason);
   }
 
   /** 守卫操作者属于请求的 Workspace（当前仅支持 workspace 1）。 */

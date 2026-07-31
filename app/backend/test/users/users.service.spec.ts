@@ -5,6 +5,15 @@ import {
 } from 'vitest';
 
 import { UsersService } from '../../src/users/users.service';
+import { ensureWorkspaceMemberSampleData } from '../../src/workspaces/workspace-member-sample-data';
+
+vi.mock('../../src/workspaces/workspace-member-sample-data', () => ({
+  ensureWorkspaceMemberSampleData: vi.fn().mockResolvedValue({
+    created: true,
+    datasetId: 'dataset-1',
+    formId: 'form-1',
+  }),
+}));
 
 describe('normalized identity uniqueness', () => {
   it('maps PostgreSQL unique-constraint conflicts to a public conflict error', async () => {
@@ -66,6 +75,7 @@ describe('normalized identity uniqueness', () => {
   });
 
   it('creates verified registrations and audit records in one transaction', async () => {
+    vi.mocked(ensureWorkspaceMemberSampleData).mockClear();
     const tx = {
       auditLog: { create: vi.fn() },
       memberRole: { create: vi.fn() },
@@ -94,10 +104,22 @@ describe('normalized identity uniqueness', () => {
     expect(tx.workspaceMember.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ joinedAt: expect.any(Date), status: 'active' }),
     });
+    expect(ensureWorkspaceMemberSampleData).toHaveBeenCalledWith(tx, {
+      workspaceId: 1,
+      workspaceMemberId: 'member-1',
+      userId: 'user-1',
+    });
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
       action: 'user.registration.complete',
       resourceId: 'user-1',
       result: 'success',
+      metadata: {
+        sampleData: {
+          created: true,
+          datasetId: 'dataset-1',
+          formId: 'form-1',
+        },
+      },
     }), tx);
   });
 });
