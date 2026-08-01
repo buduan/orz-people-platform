@@ -90,7 +90,6 @@ export class ActivitiesService {
             createdByUserId: actor.userId,
             collaborators: {
               create: {
-                workspaceId,
                 workspaceMemberId: member.id,
                 role: DatasetCollaboratorRole.owner,
                 assignedByUserId: actor.userId,

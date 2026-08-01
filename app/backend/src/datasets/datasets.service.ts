@@ -117,7 +117,6 @@ export class DatasetsService {
             createdByUserId: actor.userId,
             collaborators: {
               create: {
-                workspaceId,
                 workspaceMemberId: owner.id,
                 role: DatasetCollaboratorRole.owner,
                 assignedByUserId: actor.userId,
@@ -128,7 +127,6 @@ export class DatasetsService {
               fields: {
                 create: [
                   {
-                    workspaceId,
                     key: 'applicant_name',
                     name: 'Applicant name',
                     kind: DatasetFieldKind.text,
@@ -139,7 +137,6 @@ export class DatasetsService {
                     position: 0,
                   },
                   {
-                    workspaceId,
                     key: 'applicant_email',
                     name: 'Applicant email',
                     kind: DatasetFieldKind.email,

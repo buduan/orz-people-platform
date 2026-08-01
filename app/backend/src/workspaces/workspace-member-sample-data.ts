@@ -104,7 +104,6 @@ export async function ensureWorkspaceMemberSampleData(
       createdByUserId: input.userId,
       collaborators: {
         create: {
-          workspaceId: input.workspaceId,
           workspaceMemberId: input.workspaceMemberId,
           role: DatasetCollaboratorRole.owner,
           assignedByUserId: input.userId,
@@ -112,7 +111,6 @@ export async function ensureWorkspaceMemberSampleData(
       },
       fields: {
         create: {
-          workspaceId: input.workspaceId,
           key: 'name',
           name: '姓名',
           kind: DatasetFieldKind.text,
