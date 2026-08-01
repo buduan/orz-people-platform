@@ -165,6 +165,7 @@ export class JoinRequestsService {
     actor: AuthenticatedActor,
     status: 'approved' | 'rejected',
   ) {
+    this.assertCanReview(actor);
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.joinRequest.findUnique({
         where: { rowId },
@@ -440,6 +441,14 @@ export class JoinRequestsService {
   private assertWorkspace(workspaceId: number, actor: AuthenticatedActor): void {
     if (workspaceId !== 1 || actor.workspaceId !== workspaceId) {
       throw new ForbiddenException('Workspace access denied');
+    }
+  }
+
+  /** Join Request 审核需要显式审核权限；提交权限不等同于审核权限。 */
+  private assertCanReview(actor: AuthenticatedActor): void {
+    if (!actor.isSystemAdmin && !actor.isWorkspaceAdmin
+      && !actor.permissions.includes('join_request.review')) {
+      throw new ForbiddenException('Join Request review permission is required');
     }
   }
 }

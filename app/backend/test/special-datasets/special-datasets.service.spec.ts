@@ -26,6 +26,11 @@ const actor: AuthenticatedActor = {
   isWorkspaceAdmin: false,
 };
 
+const reviewerActor: AuthenticatedActor = {
+  ...actor,
+  permissions: ['join_request.review'],
+};
+
 describe('special Dataset invariants', () => {
   it('allows Join Requests only for guest members', async () => {
     const prisma = {
@@ -57,6 +62,24 @@ describe('special Dataset invariants', () => {
     }, actor)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('requires reviewer authorization before opening a decision transaction', async () => {
+    const transaction = vi.fn();
+    const service = new JoinRequestsService(
+      { $transaction: transaction } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.reject(1, 'row-1', { expectedRevision: 1 }, actor))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.approve(1, 'row-1', {
+      expectedRevision: 1,
+      memberTypeId: 'member-type-1',
+    }, actor)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
   it('rejects a concurrent Join Request decision with stale revision', async () => {
     const tx = {
       joinRequest: {
@@ -80,7 +103,34 @@ describe('special Dataset invariants', () => {
 
     await expect(service.reject(1, 'row-1', {
       expectedRevision: 1,
-    }, actor)).rejects.toBeInstanceOf(ConflictException);
+    }, reviewerActor)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('allows Workspace administrators to enter the decision workflow', async () => {
+    const tx = {
+      joinRequest: {
+        findUnique: vi.fn().mockResolvedValue({
+          workspaceId: 1,
+          status: JoinRequestStatus.submitted,
+          row: { subject: { userId: 'user-1' }, sourceRelations: [] },
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+    const service = new JoinRequestsService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.reject(1, 'row-1', {
+      expectedRevision: 1,
+    }, { ...actor, isWorkspaceAdmin: true })).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it('does not bind registrations while an Activity is closed', async () => {

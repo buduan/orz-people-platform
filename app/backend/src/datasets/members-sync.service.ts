@@ -19,7 +19,7 @@ export class MembersSyncService {
    * - guest 或 removed 成员 → 软删除扩展行（若存在）
    * - 非 guest 且非 removed → 创建或恢复扩展行，写入系统字段投影
    *
-   * 系统字段投影包括 user_id、name、email、member_type、member_status。
+   * 系统字段投影包括 member_user、member_name、member_email、member_type、member_status。
    * 这些字段值从 User/WorkspaceMember 记录实时读取，不信任客户端输入。
    */
   public async synchronize(
@@ -48,15 +48,21 @@ export class MembersSyncService {
     const fieldIds = new Map(fields.map((field) => [field.systemKey, field.id]));
 
     // 确保五个必须的系统字段均已创建。
-    const requiredKeys = ['user_id', 'name', 'email', 'member_type', 'member_status'];
+    const requiredKeys = [
+      'member_user',
+      'member_name',
+      'member_email',
+      'member_type',
+      'member_status',
+    ];
     const missingKey = requiredKeys.find((key) => !fieldIds.has(key));
     if (missingKey) throw new ConflictException(`Members system field is missing: ${missingKey}`);
 
     // 从当前 User 和 WorkspaceMember 记录投影系统字段值。
     const values: Prisma.InputJsonObject = {
-      [fieldIds.get('user_id')!]: member.userId,
-      [fieldIds.get('name')!]: member.user.name,
-      [fieldIds.get('email')!]: member.user.email,
+      [fieldIds.get('member_user')!]: member.userId,
+      [fieldIds.get('member_name')!]: member.user.name,
+      [fieldIds.get('member_email')!]: member.user.email,
       [fieldIds.get('member_type')!]: member.memberType.slug,
       [fieldIds.get('member_status')!]: member.status,
     };

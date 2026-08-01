@@ -9,8 +9,8 @@ import {
   validatePassword,
 } from '@orz-people-platform/utils';
 
-import { RegistrationCompleteDto, RegistrationStartDto } from './auth.dto';
-import { hasViableLoginPath } from './login-path';
+import { RegistrationCompleteDto, RegistrationStartDto } from '../../src/auth/auth.dto';
+import { hasViableLoginPath } from '../../src/auth/login-path';
 
 describe('identity normalization and password policy', () => {
   it('normalizes globally unique identity inputs before persistence', async () => {
