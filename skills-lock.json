@@ -36,6 +36,12 @@
       "sourceType": "github",
       "skillPath": "plugins/stitch-utilities/skills/taste-design/SKILL.md",
       "computedHash": "1891625787d6f0f3bc45d4a9437c187277af66c219e3ec799b1b4e67822b6146"
+    },
+    "vueuse-functions": {
+      "source": "vueuse/skills",
+      "sourceType": "github",
+      "skillPath": "skills/vueuse-functions/SKILL.md",
+      "computedHash": "665497ecb63a43cef76fafcd1d5b7ec85311060d628452f40f9f9c4114157a83"
     }
   }
 }
