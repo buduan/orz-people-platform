@@ -20,19 +20,7 @@ export class AuthRateLimitService {
   }
 
   public async recordFailure(subject: string, networkContext: string): Promise<void> {
-    const key = this.key(subject, networkContext);
-    const count = await this.redis.incr(key);
-    if (count === 1) await this.redis.expire(key, this.settings.loginWindowSeconds);
-    if (count === this.settings.loginMaxAttempts) {
-      await this.audit.record({
-        action: 'authentication.rate_limit',
-        actorType: 'system',
-        resourceType: 'authentication_subject',
-        resourceId: this.digest(subject),
-        result: 'denied',
-      });
-    }
-    if (count >= this.settings.loginMaxAttempts) throw this.rateLimitError();
+    await this.incrementAndAudit(this.key(subject, networkContext), subject, 'authentication.rate_limit');
   }
 
   public async clear(subject: string, networkContext: string): Promise<void> {
@@ -41,18 +29,7 @@ export class AuthRateLimitService {
 
   public async assertDiscoveryAllowed(subject: string, networkContext: string): Promise<void> {
     const key = `auth:login-discovery:${this.digest(subject)}:${this.digest(networkContext)}`;
-    const count = await this.redis.incr(key);
-    if (count === 1) await this.redis.expire(key, this.settings.loginWindowSeconds);
-    if (count === this.settings.loginMaxAttempts) {
-      await this.audit.record({
-        action: 'authentication.discovery.rate_limit',
-        actorType: 'system',
-        resourceType: 'authentication_subject',
-        resourceId: this.digest(subject),
-        result: 'denied',
-      });
-    }
-    if (count >= this.settings.loginMaxAttempts) throw this.rateLimitError();
+    await this.incrementAndAudit(key, subject, 'authentication.discovery.rate_limit');
   }
 
   private key(subject: string, networkContext: string): string {
@@ -65,5 +42,23 @@ export class AuthRateLimitService {
 
   private rateLimitError(): HttpException {
     return new HttpException('Authentication attempts exceeded', HttpStatus.TOO_MANY_REQUESTS);
+  }
+
+  /**
+   * 自增 Redis 计数器、在首次访问时设置 TTL、达到阈值时记录审计日志并抛出限频异常。
+   */
+  private async incrementAndAudit(key: string, subject: string, action: string): Promise<void> {
+    const count = await this.redis.incr(key);
+    if (count === 1) await this.redis.expire(key, this.settings.loginWindowSeconds);
+    if (count === this.settings.loginMaxAttempts) {
+      await this.audit.record({
+        action,
+        actorType: 'system',
+        resourceType: 'authentication_subject',
+        resourceId: this.digest(subject),
+        result: 'denied',
+      });
+    }
+    if (count >= this.settings.loginMaxAttempts) throw this.rateLimitError();
   }
 }

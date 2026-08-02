@@ -87,11 +87,7 @@ export class MfaService {
   public async requestCode(challengeId: string, factor: 'email' | 'sms'): Promise<void> {
     const challenge = await this.getChallenge(challengeId);
     if (!challenge.allowed.includes(factor)) throw new BadRequestException('MFA factor is not available');
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: challenge.userId } });
-    if (user.status !== 'active' || user.tokenVersion !== challenge.tokenVersion) {
-      await this.redis.del(this.challengeKey(challengeId));
-      throw new UnauthorizedException('MFA challenge is no longer valid');
-    }
+    const user = await this.validateChallengeUser(challengeId, challenge);
     if (factor === 'email') await this.otp.requestEmail(user.email, 'mfa_email');
     else if (user.phone) await this.otp.requestSms(user.phone, 'mfa_sms');
   }
@@ -126,11 +122,7 @@ export class MfaService {
     if (!challenge.allowed.includes('passkey')) {
       throw new BadRequestException('MFA factor is not available');
     }
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: challenge.userId } });
-    if (user.status !== 'active' || user.tokenVersion !== challenge.tokenVersion) {
-      await this.redis.del(this.challengeKey(challengeId));
-      throw new UnauthorizedException('MFA challenge is no longer valid');
-    }
+    const user = await this.validateChallengeUser(challengeId, challenge);
     return user.id;
   }
 
@@ -284,6 +276,22 @@ export class MfaService {
     const raw = await this.redis.get(this.challengeKey(id));
     if (!raw) throw new UnauthorizedException('MFA challenge expired');
     return JSON.parse(raw) as MfaChallenge;
+  }
+
+  /**
+   * 校验 Challenge 关联的用户处于活跃状态且 tokenVersion 匹配，
+   * 否则删除 Challenge 并拒绝。通过后返回 User 记录。
+   */
+  private async validateChallengeUser(
+    challengeId: string,
+    challenge: MfaChallenge,
+  ): Promise<User> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: challenge.userId } });
+    if (user.status !== 'active' || user.tokenVersion !== challenge.tokenVersion) {
+      await this.redis.del(this.challengeKey(challengeId));
+      throw new UnauthorizedException('MFA challenge is no longer valid');
+    }
+    return user;
   }
 
   private totp(secret: string): OTPAuth.TOTP {

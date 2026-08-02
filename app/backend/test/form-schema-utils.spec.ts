@@ -1,0 +1,145 @@
+import Ajv2020 from 'ajv/dist/2020';
+import addFormats from 'ajv-formats';
+import {
+  describe, expect, it,
+} from 'vitest';
+
+import {
+  canonicalizeJson,
+  checksumJson,
+  createFormItemId,
+  evaluateVisibleIf,
+  parseVisibleIf,
+  validateFormSchemaExtensions,
+} from '@orz-people-platform/utils';
+
+describe('shared Form Schema utilities', () => {
+  it('canonicalizes and hashes equivalent JSON objects identically', async () => {
+    const first = { nested: { enabled: true }, values: [1, 'two'] };
+    const second = { values: [1, 'two'], nested: { enabled: true } };
+
+    expect(canonicalizeJson(first)).toBe(canonicalizeJson(second));
+    await expect(checksumJson(first)).resolves.toBe(await checksumJson(second));
+  });
+
+  it('creates stable-format opaque item IDs', () => {
+    const first = createFormItemId();
+    const second = createFormItemId();
+
+    expect(first).toMatch(/^q_[0-9a-f-]{36}$/);
+    expect(second).not.toBe(first);
+  });
+
+  it('parses and evaluates nested visibleIf expressions', () => {
+    const expression = parseVisibleIf({
+      operator: 'and',
+      conditions: [
+        { fieldId: 'q_role', operator: 'in', values: ['student', 'teacher'] },
+        {
+          operator: 'not',
+          condition: { fieldId: 'q_disabled', operator: 'equals', value: true },
+        },
+      ],
+    });
+
+    expect(evaluateVisibleIf(expression, { q_disabled: false, q_role: 'student' })).toBe(true);
+    expect(evaluateVisibleIf(expression, { q_disabled: true, q_role: 'student' })).toBe(false);
+  });
+
+  it('rejects unknown visibleIf syntax and handles absent fields conservatively', () => {
+    expect(() => parseVisibleIf({ fieldId: 'q_role', operator: 'execute', value: 'x' }))
+      .toThrow('Unknown visibleIf operator');
+    expect(() => parseVisibleIf({
+      fieldId: 'q_role',
+      operator: 'equals',
+      unexpected: true,
+      value: 'student',
+    })).toThrow('Unknown visibleIf property');
+
+    expect(evaluateVisibleIf(
+      parseVisibleIf({ fieldId: 'q_missing', operator: 'is_empty' }),
+      {},
+    )).toBe(true);
+    expect(evaluateVisibleIf(
+      parseVisibleIf({ fieldId: 'q_missing', operator: 'not_equals', value: 'student' }),
+      {},
+    )).toBe(false);
+  });
+
+  it('keeps constraints, choices and defaults in standard JSON Schema locations', () => {
+    const ajv = new Ajv2020({ strict: true });
+    addFormats(ajv);
+    const schema = {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        q_choice: {
+          type: 'string',
+          maxLength: 3,
+          oneOf: [{ const: 'yes' }, { const: 'no' }],
+          default: 'no',
+        },
+      },
+    };
+    const validate = ajv.compile(schema);
+
+    expect(validate({ q_choice: 'yes' })).toBe(true);
+    expect(validate({ q_choice: 'maybe' })).toBe(false);
+    expect(validate({ q_choice: 'toolong' })).toBe(false);
+    expect(validate({})).toBe(true);
+  });
+
+  it('validates locale maps, field references, relation filters and x-orz keys', () => {
+    const controllingId = 'q_00000000-0000-4000-8000-000000000001';
+    const dependentId = 'q_00000000-0000-4000-8000-000000000002';
+    const schema = {
+      type: 'object',
+      properties: {
+        [controllingId]: {
+          type: 'string',
+          'x-orz': { datasetFieldId: 'dataset-field-1' },
+        },
+        [dependentId]: {
+          type: 'string',
+          'x-orz': {
+            datasetFieldId: 'dataset-field-2',
+            i18n: { title: { 'en-US': 'City', 'zh-CN': '城市' } },
+            ui: {
+              widget: 'dataset-select',
+              options: {
+                labelFieldId: 'dataset-field-name',
+                filter: {
+                  all: [{
+                    fieldId: 'dataset-field-country',
+                    operator: 'equals',
+                    valueFrom: controllingId,
+                  }],
+                },
+              },
+            },
+            visibleIf: { fieldId: controllingId, operator: 'not_equals', value: '' },
+          },
+        },
+      },
+      'x-orz': {
+        version: 1,
+        datasetId: 'dataset-1',
+        layout: [{ type: 'section', id: 'location', children: [controllingId, dependentId] }],
+        capture: {},
+      },
+    };
+
+    expect(() => validateFormSchemaExtensions(schema)).not.toThrow();
+
+    const unknownExtension = structuredClone(schema);
+    Object.assign(unknownExtension.properties[dependentId]['x-orz'], { execute: 'script' });
+    expect(() => validateFormSchemaExtensions(unknownExtension))
+      .toThrow('Unknown Form item x-orz property');
+
+    const missingReference = structuredClone(schema);
+    missingReference.properties[dependentId]['x-orz'].visibleIf.fieldId = 'q_missing';
+    expect(() => validateFormSchemaExtensions(missingReference))
+      .toThrow('Unknown visibleIf Form item');
+  });
+});

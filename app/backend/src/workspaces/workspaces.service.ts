@@ -2,9 +2,11 @@ import {
   BadRequestException, ConflictException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MemberStatus } from '@prisma/client';
+import { MemberStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { MembersSyncService } from '../datasets/members-sync.service';
+import { ensureWorkspaceMemberSampleData } from './workspace-member-sample-data';
 
 @Injectable()
 export class WorkspacesService {
@@ -12,7 +14,11 @@ export class WorkspacesService {
 
   private static readonly systemMemberTypeSlugs = ['member', 'guest'];
 
-  public constructor(private readonly prisma: PrismaService, config: ConfigService) {
+  public constructor(
+    private readonly prisma: PrismaService,
+    config: ConfigService,
+    private readonly membersSync: MembersSyncService,
+  ) {
     const configuredId = Number(config.get('DEFAULT_WORKSPACE_ID') ?? WorkspacesService.DEFAULT_ID);
     if (configuredId !== WorkspacesService.DEFAULT_ID) {
       throw new Error('DEFAULT_WORKSPACE_ID must be 1 for the first release');
@@ -79,6 +85,17 @@ export class WorkspacesService {
         throw new BadRequestException('Workspace owner must remain an active Workspace administrator');
       }
       const updated = await tx.workspaceMember.update({ where: { id: memberId }, data });
+      const sampleData = member.status === MemberStatus.pending
+        && data.status === MemberStatus.active
+        ? await ensureWorkspaceMemberSampleData(tx, {
+          workspaceId,
+          workspaceMemberId: member.id,
+          userId: member.userId,
+        })
+        : undefined;
+      if (data.memberTypeId !== undefined || data.status !== undefined) {
+        await this.membersSync.synchronize(tx, workspaceId, memberId, actorUserId);
+      }
       await tx.auditLog.create({
         data: {
           action: 'workspace.member.update',
@@ -88,7 +105,16 @@ export class WorkspacesService {
           resourceId: memberId,
           result: 'success',
           workspaceId,
-          metadata: data,
+          metadata: {
+            ...data,
+            ...(sampleData ? {
+              sampleData: {
+                created: sampleData.created,
+                datasetId: sampleData.datasetId,
+                formId: sampleData.formId,
+              },
+            } : {}),
+          } as Prisma.InputJsonObject,
         },
       });
       return updated;

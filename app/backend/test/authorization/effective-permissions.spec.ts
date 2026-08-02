@@ -4,12 +4,27 @@ import {
   describe, expect, it, vi,
 } from 'vitest';
 
-import { permissionKeys, workspacePermissionKeys } from '@orz-people-platform/types';
+import {
+  isPermissionKey,
+  permissionKeys,
+  workspacePermissionKeys,
+} from '@orz-people-platform/types';
 
-import { AuthorizationService } from './authorization.service';
-import { resolveEffectivePermissions } from './effective-permissions';
+import { AuthorizationService } from '../../src/authorization/authorization.service';
+import { resolveEffectivePermissions } from '../../src/authorization/effective-permissions';
 
 describe('effective permission precedence', () => {
+  it('registers the Dataset and Form capabilities as Workspace permissions', () => {
+    expect([
+      'activity.manage',
+      'dataset.create',
+      'dataset.manage_all',
+      'dataset.read_all',
+      'form.manage_all',
+      'join_request.review',
+    ].every(isPermissionKey)).toBe(true);
+  });
+
   it('unions roles, adds direct allow and applies direct deny last', () => {
     expect(resolveEffectivePermissions({
       directPermissions: [

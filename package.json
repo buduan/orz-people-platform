@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "lint:changed": "eslint --cache --cache-location .eslintcache .",
     "lint:incremental": "pnpm lint:changed",
+    "migrate": "pnpm --filter @orz-people-platform/backend prisma:deploy",
     "preview:frontend": "pnpm --filter @orz-people-platform/frontend preview",
     "start": "docker compose -f compose.yml up --build",
     "start:db": "docker compose -f compose.dev.yml up -d",

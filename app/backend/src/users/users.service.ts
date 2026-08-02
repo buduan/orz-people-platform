@@ -8,6 +8,7 @@ import { validatePassword } from '@orz-people-platform/utils';
 import { AuditService } from '../audit/audit.service';
 import { SessionService } from '../auth/session.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ensureWorkspaceMemberSampleData } from '../workspaces/workspace-member-sample-data';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import type { CreateUserDto, UpdateProfileDto } from './users.dto';
 
@@ -152,6 +153,11 @@ export class UsersService {
             assignedByUserId: created.id,
           },
         });
+        const sampleData = await ensureWorkspaceMemberSampleData(tx, {
+          workspaceId,
+          workspaceMemberId: member.id,
+          userId: created.id,
+        });
         await this.audit.record({
           action: 'user.registration.complete',
           actorType: 'system',
@@ -159,6 +165,13 @@ export class UsersService {
           resourceId: created.id,
           result: 'success',
           workspaceId,
+          metadata: {
+            sampleData: {
+              created: sampleData.created,
+              datasetId: sampleData.datasetId,
+              formId: sampleData.formId,
+            },
+          },
         }, tx);
         return created;
       });

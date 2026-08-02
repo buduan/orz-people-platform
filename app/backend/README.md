@@ -29,7 +29,7 @@ Run Prisma generation and migration deployment after reviewing the target databa
 
 ```bash
 pnpm --filter @orz-people-platform/backend prisma:generate
-pnpm --filter @orz-people-platform/backend prisma:deploy
+pnpm migrate
 ```
 
 The repository currently contains two empty, untracked historical migration directories:
@@ -47,6 +47,19 @@ CLI arguments, and applies the same password policy as the HTTP API.
 
 ```bash
 pnpm bootstrap:admin --email=admin@example.com
+```
+
+For production or other non-interactive environments, pass `--non-interactive` and provide all
+administrator details through environment variables. Do not store `BOOTSTRAP_ADMIN_PASSWORD` in a
+checked-in file; inject it from the deployment secret store.
+
+```bash
+BOOTSTRAP_ADMIN_EMAIL=admin@example.com \
+BOOTSTRAP_ADMIN_USERNAME=admin \
+BOOTSTRAP_ADMIN_NAME='System Administrator' \
+BOOTSTRAP_ADMIN_NICKNAME=Admin \
+BOOTSTRAP_ADMIN_PASSWORD='use-a-strong-secret' \
+pnpm bootstrap:admin --non-interactive
 ```
 
 Run the command only against an uninitialized database. A repeated run reports that initialization

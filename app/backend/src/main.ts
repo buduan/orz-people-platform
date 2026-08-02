@@ -1,3 +1,5 @@
+import { networkInterfaces } from 'node:os';
+
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CustomOrigin } from '@nestjs/common/interfaces/external/cors-options.interface';
@@ -8,6 +10,12 @@ import { AppModule } from './app.module';
 import { ApiResponseInterceptor } from './api-response.interceptor';
 import { isCorsOriginAllowed } from './cors';
 import { HttpExceptionFilter } from './http-exception.filter';
+
+function getNetworkAddress(): string | undefined {
+  return Object.values(networkInterfaces())
+    .flat()
+    .find((network) => network?.family === 'IPv4' && !network.internal)?.address;
+}
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -49,7 +57,11 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableShutdownHooks();
   await app.listen(port);
-  Logger.log(`Backend listening on port ${port}`, 'Bootstrap');
+  const networkAddress = getNetworkAddress();
+  Logger.log(
+    `Backend listening on:\n  ➜ Local:   http://localhost:${port}\n  ➜ Network: ${networkAddress ? `http://${networkAddress}:${port}` : 'unavailable'}`,
+    'Bootstrap',
+  );
   Logger.log(`Swagger UI available at ${apiOrigin.replace(/\/$/, '')}/docs`, 'Bootstrap');
 }
 

@@ -2,7 +2,7 @@ import {
   describe, expect, it, vi,
 } from 'vitest';
 
-import { OtpService } from './otp.service';
+import { OtpService } from '../../src/auth/otp.service';
 
 class FakeOtpRedis {
   public readonly counters = new Map<string, number>();

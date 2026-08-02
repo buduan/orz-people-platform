@@ -2,7 +2,7 @@ import {
   describe, expect, it, vi,
 } from 'vitest';
 
-import { NotificationsService } from './notifications.service';
+import { NotificationsService } from '../../src/notifications/notifications.service';
 
 describe('mock notifications', () => {
   it('does not return or log email and SMS verification codes', async () => {
