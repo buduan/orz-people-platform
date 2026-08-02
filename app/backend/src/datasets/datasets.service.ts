@@ -519,11 +519,7 @@ export class DatasetsService {
     actor: AuthenticatedActor,
     client: DbClient = this.prisma,
   ) {
-    this.assertWorkspace(workspaceId, actor);
-    const dataset = await client.dataset.findUnique({
-      where: { workspaceId_id: { workspaceId, id: datasetId } },
-    });
-    if (!dataset) throw new NotFoundException('Dataset not found');
+    const dataset = await this.findDatasetOrThrow(workspaceId, datasetId, actor, client);
     if (this.hasGlobalRead(actor)) return dataset;
     const member = await this.findActorMember(workspaceId, actor.userId, client);
     const collaborator = member && await client.datasetCollaborator.findUnique({
@@ -544,11 +540,7 @@ export class DatasetsService {
     ownerOnly = false,
     client: DbClient = this.prisma,
   ) {
-    this.assertWorkspace(workspaceId, actor);
-    const dataset = await client.dataset.findUnique({
-      where: { workspaceId_id: { workspaceId, id: datasetId } },
-    });
-    if (!dataset) throw new NotFoundException('Dataset not found');
+    const dataset = await this.findDatasetOrThrow(workspaceId, datasetId, actor, client);
     // 系统/Workspace 管理员及持有 dataset.manage_all 权限的用户绕过协作者校验。
     if (actor.isSystemAdmin || actor.isWorkspaceAdmin || actor.permissions.includes('dataset.manage_all')) {
       return dataset;
@@ -580,6 +572,21 @@ export class DatasetsService {
   private assertWorkspace(workspaceId: number, actor: AuthenticatedActor): void {
     if (workspaceId !== 1) throw new BadRequestException('Only the default Workspace is available');
     if (actor.workspaceId !== workspaceId) throw new ForbiddenException('Workspace access denied');
+  }
+
+  /** 查找 Dataset 并校验 workspace 权限，未找到时抛出 NotFoundException。 */
+  private async findDatasetOrThrow(
+    workspaceId: number,
+    datasetId: string,
+    actor: AuthenticatedActor,
+    client: DbClient = this.prisma,
+  ) {
+    this.assertWorkspace(workspaceId, actor);
+    const dataset = await client.dataset.findUnique({
+      where: { workspaceId_id: { workspaceId, id: datasetId } },
+    });
+    if (!dataset) throw new NotFoundException('Dataset not found');
+    return dataset;
   }
 
   /** 操作者是否具有全局读取权限（管理员或持有 dataset.read_all / dataset.manage_all）。 */

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../audit/audit.module';
+import { CommonModule } from '../common/common.module';
 import { DatasetsModule } from '../datasets/datasets.module';
 import { SpecialDatasetsModule } from '../special-datasets/special-datasets.module';
 import { FormSubmissionsService } from './form-submissions.service';
@@ -11,7 +12,7 @@ import { FormSubmissionsService } from './form-submissions.service';
  * （Join Request 和 Activity 报名绑定）。
  */
 @Module({
-  imports: [AuditModule, DatasetsModule, SpecialDatasetsModule],
+  imports: [AuditModule, CommonModule, DatasetsModule, SpecialDatasetsModule],
   providers: [FormSubmissionsService],
 })
 export class FormSubmissionsModule {}

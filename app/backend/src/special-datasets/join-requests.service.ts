@@ -16,6 +16,8 @@ import {
 import type { AuthenticatedActor } from '@orz-people-platform/types';
 
 import { AuditService } from '../audit/audit.service';
+import { RelationValidationService } from '../common/relation-validation.service';
+import { createRowVersion } from '../common/row-version.factory';
 import { DatasetSchemaService } from '../datasets/dataset-schema.service';
 import { MembersSyncService } from '../datasets/members-sync.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -40,6 +42,7 @@ export class JoinRequestsService {
     private readonly schemas: DatasetSchemaService,
     private readonly membersSync: MembersSyncService,
     private readonly audit: AuditService,
+    private readonly relationValidation: RelationValidationService,
   ) {}
 
   /**
@@ -72,7 +75,7 @@ export class JoinRequestsService {
 
     // 校验用户提交的字段值。
     const validated = this.schemas.validateRow(fields, dto);
-    await this.validateRelationTargets(workspaceId, fields, validated.relations);
+    await this.relationValidation.validate(workspaceId, fields, validated.relations);
 
     // 定位系统身份字段。
     const systemFields = new Map(fields.map((field) => [field.systemKey, field.id]));
@@ -292,16 +295,14 @@ export class JoinRequestsService {
         },
       }),
     ]);
-    await tx.datasetRowVersion.create({
-      data: {
-        rowId: row.id,
-        version: row.revision,
-        operation: DatasetRowVersionOperation.create,
-        valuesSnapshot: values,
-        relationsSnapshot: Object.fromEntries(relations) as Prisma.InputJsonObject,
-        changedFieldIds: [...Object.keys(values), ...relations.keys()],
-        actorUserId: actor.userId,
-      },
+    await createRowVersion({
+      tx,
+      rowId: row.id,
+      version: row.revision,
+      operation: DatasetRowVersionOperation.create,
+      values,
+      relations,
+      actorUserId: actor.userId,
     });
     await this.recordSubmissionAudit(tx, workspaceId, datasetId, row.id, actor.userId, 'create');
     return tx.joinRequest.findUniqueOrThrow({ where: { rowId: row.id } });
@@ -343,39 +344,17 @@ export class JoinRequestsService {
         revision: request.revision + 1,
       },
     });
-    await tx.datasetRowVersion.create({
-      data: {
-        rowId: row.id,
-        version: updated.revision,
-        operation: DatasetRowVersionOperation.update,
-        valuesSnapshot: values,
-        relationsSnapshot: Object.fromEntries(relations) as Prisma.InputJsonObject,
-        changedFieldIds: [...Object.keys(values), ...relations.keys()],
-        actorUserId: actor.userId,
-      },
+    await createRowVersion({
+      tx,
+      rowId: row.id,
+      version: updated.revision,
+      operation: DatasetRowVersionOperation.update,
+      values,
+      relations,
+      actorUserId: actor.userId,
     });
     await this.recordSubmissionAudit(tx, workspaceId, datasetId, row.id, actor.userId, 'resubmit');
     return tx.joinRequest.findUniqueOrThrow({ where: { rowId: row.id } });
-  }
-
-  /** 批量验证关联目标存在且属于正确的 Dataset。 */
-  private async validateRelationTargets(
-    workspaceId: number,
-    fields: Array<{ id: string; relationTargetDatasetId: string | null }>,
-    relations: Map<string, string[]>,
-  ): Promise<void> {
-    const ids = [...new Set([...relations.values()].flat())];
-    const rows = ids.length === 0 ? [] : await this.prisma.datasetRow.findMany({
-      where: { id: { in: ids }, workspaceId, deletedAt: null },
-      select: { id: true, datasetId: true },
-    });
-    const datasetsByRow = new Map(rows.map((row) => [row.id, row.datasetId]));
-    const fieldsById = new Map(fields.map((field) => [field.id, field]));
-    relations.forEach((targetIds, fieldId) => {
-      const targetDatasetId = fieldsById.get(fieldId)?.relationTargetDatasetId;
-      const invalid = targetIds.find((id) => datasetsByRow.get(id) !== targetDatasetId);
-      if (invalid) throw new BadRequestException(`Invalid relation target: ${invalid}`);
-    });
   }
 
   /** 将关联关系写入 DatasetRelation。 */

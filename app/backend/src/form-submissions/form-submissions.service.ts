@@ -25,6 +25,8 @@ import type { AuthenticatedActor, JsonValue } from '@orz-people-platform/types';
 import { checksumJson } from '@orz-people-platform/utils';
 
 import { AuditService } from '../audit/audit.service';
+import { RelationValidationService } from '../common/relation-validation.service';
+import { createRowVersion } from '../common/row-version.factory';
 import { DatasetSchemaService } from '../datasets/dataset-schema.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivitiesService } from '../special-datasets/activities.service';
@@ -70,6 +72,7 @@ export class FormSubmissionsService {
     private readonly schemas: DatasetSchemaService,
     private readonly activities: ActivitiesService,
     private readonly audit: AuditService,
+    private readonly relationValidation: RelationValidationService,
   ) {
     // useDefaults: true —— AJV 会在校验前自动填入 Schema 中声明的 default 值。
     this.ajv = new Ajv2020({
@@ -139,12 +142,8 @@ export class FormSubmissionsService {
     });
 
     // ---- 幂等检查（事务外） ----
-    if (idempotencyKey) {
-      const existing = await this.prisma.formSubmission.findUnique({
-        where: { formId_idempotencyKey: { formId: form.id, idempotencyKey } },
-      });
-      if (existing) return this.resolveIdempotent(existing, payloadChecksum);
-    }
+    const existing = await this.checkIdempotent(this.prisma, form.id, idempotencyKey, payloadChecksum);
+    if (existing) return existing;
 
     const version = form.activeVersion;
     if (!version || form.status !== FormStatus.active
@@ -201,7 +200,7 @@ export class FormSubmissionsService {
       {},
       version.writeMode === FormWriteMode.update_subject_row,
     );
-    await this.validateRelationTargets(form.workspaceId, fields, validated.relations);
+    await this.relationValidation.validate(form.workspaceId, fields, validated.relations);
 
     // 设备信息采集（从 HTTP User-Agent 解析）。
     const capturedValues = this.captureValues(
@@ -220,12 +219,8 @@ export class FormSubmissionsService {
       // Serializable 隔离级别防止并发幂等写入冲突。
       return await this.prisma.$transaction(async (tx) => {
         // ---- 事务内二次幂等检查 ----
-        if (idempotencyKey) {
-          const concurrent = await tx.formSubmission.findUnique({
-            where: { formId_idempotencyKey: { formId: form.id, idempotencyKey } },
-          });
-          if (concurrent) return this.resolveIdempotent(concurrent, payloadChecksum);
-        }
+        const concurrent = await this.checkIdempotent(tx, form.id, idempotencyKey, payloadChecksum);
+        if (concurrent) return concurrent;
 
         // ---- 按 writeMode 分支执行写入 ----
         const write = version.writeMode === FormWriteMode.update_subject_row
@@ -283,12 +278,8 @@ export class FormSubmissionsService {
       // P2002 / P2034 = 并发写入冲突；在事务外再次尝试幂等匹配。
       if (error instanceof Prisma.PrismaClientKnownRequestError
         && (error.code === 'P2002' || error.code === 'P2034')) {
-        if (idempotencyKey) {
-          const existing = await this.prisma.formSubmission.findUnique({
-            where: { formId_idempotencyKey: { formId: form.id, idempotencyKey } },
-          });
-          if (existing) return this.resolveIdempotent(existing, payloadChecksum);
-        }
+        const existing = await this.checkIdempotent(this.prisma, form.id, idempotencyKey, payloadChecksum);
+        if (existing) return existing;
         throw new ConflictException('Submission changed concurrently');
       }
       throw error;
@@ -377,16 +368,14 @@ export class FormSubmissionsService {
     }
 
     // 创建行版本快照。
-    const rowVersion = await tx.datasetRowVersion.create({
-      data: {
-        rowId: row.id,
-        version: row.revision,
-        operation: DatasetRowVersionOperation.create,
-        valuesSnapshot: values,
-        relationsSnapshot: Object.fromEntries(relations) as Prisma.InputJsonObject,
-        changedFieldIds: [...Object.keys(values), ...relations.keys()],
-        actorUserId: actor?.userId,
-      },
+    const rowVersion = await createRowVersion({
+      tx,
+      rowId: row.id,
+      version: row.revision,
+      operation: DatasetRowVersionOperation.create,
+      values,
+      relations,
+      actorUserId: actor?.userId,
     });
     return {
       operation: FormSubmissionOperation.created,
@@ -440,16 +429,14 @@ export class FormSubmissionsService {
         revision: { increment: 1 },
       },
     });
-    const rowVersion = await tx.datasetRowVersion.create({
-      data: {
-        rowId,
-        version: row.revision,
-        operation: DatasetRowVersionOperation.update,
-        valuesSnapshot: values,
-        relationsSnapshot: Object.fromEntries(relations) as Prisma.InputJsonObject,
-        changedFieldIds: [...Object.keys(values), ...relations.keys()],
-        actorUserId: actor.userId,
-      },
+    const rowVersion = await createRowVersion({
+      tx,
+      rowId,
+      version: row.revision,
+      operation: DatasetRowVersionOperation.update,
+      values,
+      relations,
+      actorUserId: actor.userId,
     });
     return {
       operation: FormSubmissionOperation.updated,
@@ -633,26 +620,6 @@ export class FormSubmissionsService {
     return null;
   }
 
-  /** 批量验证关联目标行存在且属于正确的 Dataset。 */
-  private async validateRelationTargets(
-    workspaceId: number,
-    fields: Array<{ id: string; relationTargetDatasetId: string | null }>,
-    relations: Map<string, string[]>,
-  ): Promise<void> {
-    const ids = [...new Set([...relations.values()].flat())];
-    const rows = ids.length === 0 ? [] : await this.prisma.datasetRow.findMany({
-      where: { id: { in: ids }, workspaceId, deletedAt: null },
-      select: { id: true, datasetId: true },
-    });
-    const rowDatasets = new Map(rows.map((row) => [row.id, row.datasetId]));
-    const fieldsById = new Map(fields.map((field) => [field.id, field]));
-    relations.forEach((targetIds, fieldId) => {
-      const targetDatasetId = fieldsById.get(fieldId)?.relationTargetDatasetId;
-      const invalid = targetIds.find((rowId) => rowDatasets.get(rowId) !== targetDatasetId);
-      if (invalid) throw new BadRequestException(`Invalid relation target: ${invalid}`);
-    });
-  }
-
   /** 将关联关系批量写入 DatasetRelation。 */
   private async writeRelations(
     tx: Prisma.TransactionClient,
@@ -703,6 +670,24 @@ export class FormSubmissionsService {
     const now = new Date();
     if (opensAt && now < opensAt) throw new ConflictException('Form is not open yet');
     if (closesAt && now > closesAt) throw new ConflictException('Form is closed');
+  }
+
+  /**
+   * 幂等检查：若存在相同 idempotencyKey 的提交则返回已有结果，
+   * 否则返回 null 继续正常流程。兼容 Prisma 事务内外的 client。
+   */
+  private async checkIdempotent(
+    client: Pick<Prisma.TransactionClient, 'formSubmission'>,
+    formId: string,
+    idempotencyKey: string | undefined,
+    payloadChecksum: string,
+  ) {
+    if (!idempotencyKey) return null;
+    const existing = await client.formSubmission.findUnique({
+      where: { formId_idempotencyKey: { formId, idempotencyKey } },
+    });
+    if (!existing) return null;
+    return this.resolveIdempotent(existing, payloadChecksum);
   }
 
   /**

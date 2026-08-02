@@ -47,11 +47,7 @@ export class ActivitiesService {
 
   /** 获取单个 Activity。无 activity.manage 权限时通过报名 Dataset 的读取权限间接授权。 */
   public async get(workspaceId: number, activityId: string, actor: AuthenticatedActor) {
-    this.assertWorkspace(workspaceId, actor);
-    const activity = await this.prisma.activity.findUnique({
-      where: { workspaceId_id: { workspaceId, id: activityId } },
-    });
-    if (!activity) throw new NotFoundException('Activity not found');
+    const activity = await this.findActivityOrThrow(workspaceId, activityId, actor);
     if (!actor.permissions.includes('activity.manage')) {
       await this.datasets.assertCanRead(workspaceId, activity.registrationDatasetId, actor);
     }
@@ -322,10 +318,9 @@ export class ActivitiesService {
   }
 
   /**
-   * 查找 Activity 并验证管理权限。
-   * 持有 activity.manage 权限的用户直接通过；否则需要报名 Dataset 的管理权限。
+   * 查找 Activity 并校验 workspace 权限，未找到时抛出 NotFoundException。
    */
-  private async findManaged(
+  private async findActivityOrThrow(
     workspaceId: number,
     activityId: string,
     actor: AuthenticatedActor,
@@ -335,6 +330,19 @@ export class ActivitiesService {
       where: { workspaceId_id: { workspaceId, id: activityId } },
     });
     if (!activity) throw new NotFoundException('Activity not found');
+    return activity;
+  }
+
+  /**
+   * 查找 Activity 并验证管理权限。
+   * 持有 activity.manage 权限的用户直接通过；否则需要报名 Dataset 的管理权限。
+   */
+  private async findManaged(
+    workspaceId: number,
+    activityId: string,
+    actor: AuthenticatedActor,
+  ) {
+    const activity = await this.findActivityOrThrow(workspaceId, activityId, actor);
     if (!actor.permissions.includes('activity.manage')) {
       await this.datasets.assertCanManage(workspaceId, activity.registrationDatasetId, actor);
     }

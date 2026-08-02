@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../audit/audit.module';
+import { CommonModule } from '../common/common.module';
 import { DatasetsModule } from '../datasets/datasets.module';
 import { ActivitiesService } from './activities.service';
 import { JoinRequestsService } from './join-requests.service';
@@ -11,7 +12,7 @@ import { JoinRequestsService } from './join-requests.service';
  * 和业务不变量的 Dataset 类型。
  */
 @Module({
-  imports: [AuditModule, DatasetsModule],
+  imports: [AuditModule, CommonModule, DatasetsModule],
   providers: [ActivitiesService, JoinRequestsService],
   exports: [ActivitiesService, JoinRequestsService],
 })

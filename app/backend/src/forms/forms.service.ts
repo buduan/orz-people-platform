@@ -112,11 +112,7 @@ export class FormsService {
     this.validateMetadata(dto);
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // 深拷贝 Schema，后续可能修改 capture 字段映射。
-        const schema = structuredClone(dto.schema);
-        await this.ensureCaptureFields(tx, dataset.id, schema, actor.userId);
-        await this.validateDefinition(tx, dataset, schema, dto);
-        const checksum = await checksumJson(schema as JsonValue);
+        const { schema, checksum } = await this.prepareFormSchema(tx, dataset, dto, actor.userId);
         const form = await tx.form.create({
           data: {
             workspaceId,
@@ -172,10 +168,7 @@ export class FormsService {
     }
     this.validateMetadata(dto);
     return this.prisma.$transaction(async (tx) => {
-      const schema = structuredClone(dto.schema);
-      await this.ensureCaptureFields(tx, dataset.id, schema, actor.userId);
-      await this.validateDefinition(tx, dataset, schema, dto);
-      const checksum = await checksumJson(schema as JsonValue);
+      const { schema, checksum } = await this.prepareFormSchema(tx, dataset, dto, actor.userId);
       const latest = await tx.formVersion.findFirst({
         where: { formId },
         orderBy: { version: 'desc' },
@@ -330,13 +323,7 @@ export class FormsService {
    * 根据请求 locale 选择最佳 i18n 文案；返回结构化读模型而非原始数据库记录。
    */
   public async getPublished(slug: string, locale?: string) {
-    const form = await this.prisma.form.findUnique({
-      where: { workspaceId_slug: { workspaceId: 1, slug } },
-      include: { activeVersion: true },
-    });
-    if (!form || form.status !== FormStatus.active || !form.activeVersion) {
-      throw new NotFoundException('Published Form not found');
-    }
+    const form = await this.findPublishedForm(slug);
     const version = form.activeVersion;
     const selectedLocale = this.selectLocale(
       version.nameI18n as Record<string, string>,
@@ -372,13 +359,7 @@ export class FormsService {
     rawValues: string | undefined,
     take: number,
   ) {
-    const form = await this.prisma.form.findUnique({
-      where: { workspaceId_slug: { workspaceId: 1, slug } },
-      include: { activeVersion: true },
-    });
-    if (!form || form.status !== FormStatus.active || !form.activeVersion) {
-      throw new NotFoundException('Published Form not found');
-    }
+    const form = await this.findPublishedForm(slug);
     const schema = form.activeVersion.schema as Record<string, unknown>;
     const property = (schema.properties as Record<string, Record<string, unknown>>)?.[itemId];
     if (!property) throw new NotFoundException('Form item not found');
@@ -641,5 +622,37 @@ export class FormsService {
         || (Array.isArray(actual) && actual.includes(expected));
     }
     return false;
+  }
+
+  /**
+   * 在事务中准备 Form Schema：深拷贝、处理设备信息采集字段、校验定义、计算校验和。
+   */
+  private async prepareFormSchema(
+    tx: Prisma.TransactionClient,
+    dataset: Pick<Dataset, 'id' | 'subjectMode' | 'type'>,
+    dto: Pick<VersionDefinitionInput, 'schema' | 'defaultLocale' | 'nameI18n' | 'submissionAccess' | 'writeMode'>,
+    userId: string,
+  ): Promise<{ schema: Record<string, unknown>; checksum: string }> {
+    const schema = structuredClone(dto.schema);
+    await this.ensureCaptureFields(tx, dataset.id, schema, userId);
+    await this.validateDefinition(tx, dataset, schema, dto);
+    const checksum = await checksumJson(schema as JsonValue);
+    return { schema, checksum };
+  }
+
+  /**
+   * 查找已发布的 Form（含 activeVersion），未找到或状态异常时抛出 NotFoundException。
+   * 返回类型已确保 activeVersion 非 null。
+   */
+  private async findPublishedForm(slug: string) {
+    const form = await this.prisma.form.findUnique({
+      where: { workspaceId_slug: { workspaceId: 1, slug } },
+      include: { activeVersion: true },
+    });
+    if (!form || form.status !== FormStatus.active || !form.activeVersion) {
+      throw new NotFoundException('Published Form not found');
+    }
+    // 经过上述校验后 activeVersion 必然非 null，显式断言使调用方无需重复检查。
+    return form as typeof form & { activeVersion: NonNullable<typeof form.activeVersion> };
   }
 }

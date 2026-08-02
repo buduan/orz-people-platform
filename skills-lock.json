@@ -1,6 +1,18 @@
 {
   "version": 1,
   "skills": {
+    "dry-refactoring": {
+      "source": "kucherenko/jscpd",
+      "sourceType": "github",
+      "skillPath": "skills/dry-refactoring/SKILL.md",
+      "computedHash": "ae599cfc4fcd0cc7e1c287f291e84c839002d0c3725654432c457d92e5cdaae4"
+    },
+    "jscpd": {
+      "source": "kucherenko/jscpd",
+      "sourceType": "github",
+      "skillPath": "skills/jscpd/SKILL.md",
+      "computedHash": "20145cc773c66d1a3959a5a3a32e76cbe2e7598c8ea5eda0412c3565dace8766"
+    },
     "nestjs-best-practices": {
       "source": "kadajett/agent-nestjs-skills",
       "sourceType": "github",

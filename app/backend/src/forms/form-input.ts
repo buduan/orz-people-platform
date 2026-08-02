@@ -3,10 +3,8 @@ import {
   FormWriteMode,
 } from '@prisma/client';
 
-/** 创建 Form 的入参，包含首个草稿版本的全部定义。 */
-export interface CreateFormInput {
-  datasetId: string;
-  slug: string;
+/** Form 元数据的公共字段。 */
+interface BaseFormMetadata {
   /** 默认语言，必须存在于所有 i18n map 中。 */
   defaultLocale: string;
   nameI18n: Record<string, string>;
@@ -22,17 +20,14 @@ export interface CreateFormInput {
   schema: Record<string, unknown>;
 }
 
+/** 创建 Form 的入参，包含首个草稿版本的全部定义。 */
+export interface CreateFormInput extends BaseFormMetadata {
+  datasetId: string;
+  slug: string;
+}
+
 /** 更新 Form 草稿版本的入参，携带乐观锁版本号。 */
-export interface UpdateFormDraftInput {
+export interface UpdateFormDraftInput extends BaseFormMetadata {
   /** 调用方必须传入当前草稿的 revision。 */
   expectedRevision: number;
-  defaultLocale: string;
-  nameI18n: Record<string, string>;
-  descriptionI18n?: Record<string, string>;
-  closingMessageI18n?: Record<string, string>;
-  opensAt?: string;
-  closesAt?: string;
-  submissionAccess: FormSubmissionAccess;
-  writeMode: FormWriteMode;
-  schema: Record<string, unknown>;
 }
