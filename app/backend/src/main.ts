@@ -10,6 +10,7 @@ import { AppModule } from './app.module';
 import { ApiResponseInterceptor } from './api-response.interceptor';
 import { isCorsOriginAllowed } from './cors';
 import { HttpExceptionFilter } from './http-exception.filter';
+import { listenOnAvailablePort } from './listen-on-available-port';
 
 function getNetworkAddress(): string | undefined {
   return Object.values(networkInterfaces())
@@ -20,8 +21,7 @@ function getNetworkAddress(): string | undefined {
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
-  const port = Number(config.get('PORT') ?? 3000);
-  const apiOrigin = config.get<string>('API_ORIGIN') || `http://localhost:${port}`;
+  const configuredPort = Number(config.get('PORT') ?? 3000);
   const appOrigin = config.get<string>('APP_ORIGIN');
   const isDevelopment = (config.get<string>('NODE_ENV') || 'development') === 'development';
   const corsOrigin: CustomOrigin = (origin, callback) => {
@@ -31,6 +31,21 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: corsOrigin,
   });
+
+  app.useGlobalPipes(new ValidationPipe({
+    forbidNonWhitelisted: true,
+    transform: true,
+    whitelist: true,
+  }));
+  app.useGlobalInterceptors(new ApiResponseInterceptor());
+  app.useGlobalFilters(new HttpExceptionFilter());
+  app.enableShutdownHooks();
+  const port = await listenOnAvailablePort(
+    (listenPort) => app.listen(listenPort),
+    configuredPort,
+    isDevelopment,
+  );
+  const apiOrigin = config.get<string>('API_ORIGIN') || `http://localhost:${port}`;
 
   const openApiConfig = new DocumentBuilder()
     .setOpenAPIVersion('3.1.0')
@@ -48,15 +63,6 @@ async function bootstrap(): Promise<void> {
     yamlDocumentUrl: 'docs-yaml',
   });
 
-  app.useGlobalPipes(new ValidationPipe({
-    forbidNonWhitelisted: true,
-    transform: true,
-    whitelist: true,
-  }));
-  app.useGlobalInterceptors(new ApiResponseInterceptor());
-  app.useGlobalFilters(new HttpExceptionFilter());
-  app.enableShutdownHooks();
-  await app.listen(port);
   const networkAddress = getNetworkAddress();
   Logger.log(
     `Backend listening on:\n  ➜ Local:   http://localhost:${port}\n  ➜ Network: ${networkAddress ? `http://${networkAddress}:${port}` : 'unavailable'}`,
