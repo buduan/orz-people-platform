@@ -9,7 +9,7 @@
     "typecheck": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && nuxt typecheck"
   },
   "dependencies": {
-    "@nuxt/ui": "^3.3.7",
+    "@nuxt/ui": "^4.10.0",
     "@orz-people-platform/types": "workspace:*",
     "@orz-people-platform/utils": "workspace:*",
     "@pinia/nuxt": "catalog:",

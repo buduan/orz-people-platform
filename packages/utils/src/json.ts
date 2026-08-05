@@ -13,9 +13,13 @@ function canonicalize(value: JsonValue): string {
     return JSON.stringify(value);
   }
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`;
-  return `{${Object.keys(value).sort().map((key) => (
-    `${JSON.stringify(key)}:${canonicalize(value[key])}`
-  )).join(',')}}`;
+  return `{${Object.keys(value).sort().map((key) => {
+    const entryValue = value[key];
+    if (entryValue === undefined) {
+      throw new TypeError(`Missing JSON value for key "${key}"`);
+    }
+    return `${JSON.stringify(key)}:${canonicalize(entryValue)}`;
+  }).join(',')}}`;
 }
 
 /** 返回对象 key 按字母序递归排序后的确定性 JSON 字符串。 */

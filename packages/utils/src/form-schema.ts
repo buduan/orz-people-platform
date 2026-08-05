@@ -81,7 +81,8 @@ function validateFilter(value: unknown, itemIds: ReadonlySet<string>): void {
   assertKeys(filter, ['all', 'any'], 'relation filter');
   const groups = ['all', 'any'].filter((key) => Object.hasOwn(filter, key));
   if (groups.length !== 1) throw new TypeError('relation filter requires exactly one of all or any');
-  const conditions = filter[groups[0]];
+  const groupKey = groups[0] as 'all' | 'any';
+  const conditions = filter[groupKey];
   if (!Array.isArray(conditions) || conditions.length === 0) {
     throw new TypeError(`relation filter ${groups[0]} must be a non-empty array`);
   }
