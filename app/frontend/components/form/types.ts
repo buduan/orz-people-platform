@@ -1,4 +1,10 @@
 import type { ComponentPublicInstance } from 'vue';
+import type {
+  FormItemId,
+  FormLayoutNode,
+  JsonSchema,
+  JsonValue,
+} from '@orz-people-platform/types';
 
 /** UInput / UTextarea 暴露的最小聚焦接口，供标题 / 描述内联编辑框使用。 */
 export interface FormFieldTitleInput {
@@ -11,3 +17,16 @@ export type FocusableInputInstance =
   | FormFieldTitleInput
   | { inputRef: FormFieldTitleInput }
   | { textareaRef: FormFieldTitleInput };
+
+/** FormRenderer 模式：编辑器选中 vs 填写。 */
+export type FormRenderMode = 'edit' | 'fill';
+
+/** FormRenderer → FormField 的共享上下文。 */
+export interface FormRenderContext {
+  locale: string;
+  mode: FormRenderMode;
+  schema: JsonSchema;
+  state: Record<FormItemId, JsonValue | undefined>;
+}
+
+export type { FormLayoutNode };

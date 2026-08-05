@@ -27,6 +27,11 @@ import {
 | `parseVisibleIf` | `visible-if.ts` | 解析并严格校验 `visibleIf` 条件表达式 |
 | `evaluateVisibleIf` | `visible-if.ts` | 使用表单值计算条件表达式结果 |
 | `validateFormSchemaExtensions` | `form-schema.ts` | 校验表单 Schema 中的 `x-orz` 扩展 |
+| `resolveLocalizedText` | `form-schema.ts` | 按 locale 解析多语言文案 |
+| `getRootExtension` / `getItemExtension` | `form-schema.ts` | 软读取根 / item 的 `x-orz` |
+| `getSchemaProperties` / `getRequiredItemIds` | `form-schema.ts` | 软读取 properties 与 required |
+| `getChoiceOptions` | `form-schema.ts` | 从 `oneOf` 投影选项列表 |
+| `isItemVisible` / `createInitialFormState` | `form-schema.ts` | 条件显示与默认值 state |
 | `PasswordPolicyResult` | `password-policy.ts` | 描述密码策略校验结果 |
 | `JsonValue`、`JsonSchema`、`JsonSchemaObject` | `parse-json-schema.ts` | 重新导出的共享 JSON 类型 |
 
@@ -70,6 +75,18 @@ const schema = parseJsonSchema(source);
 
 // 先执行 AJV 等标准 JSON Schema 校验，再校验平台扩展。
 validateFormSchemaExtensions(schema);
+```
+
+### 读路径 helpers
+
+以下函数用于渲染或映射，**不抛异常**：结构不符时返回 `null` / 空集合。
+
+```ts [packages/utils/src/form-schema.ts]
+resolveLocalizedText({ 'zh-CN': '姓名', en: 'Name' }, 'en'); // 'Name'
+getRootExtension(schema)?.layout;
+getItemExtension(schema.properties[itemId]);
+getChoiceOptions(property, 'zh-CN');
+createInitialFormState(schema);
 ```
 
 ## 身份标识

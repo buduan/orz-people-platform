@@ -1,16 +1,27 @@
 import type {
+  FormItemExtension,
+  FormItemId,
+  FormRootExtension,
   JsonSchema,
   JsonSchemaObject,
+  JsonValue,
+  LocalizedText,
   RelationFilterOperator,
   VisibleIfExpression,
 } from '@orz-people-platform/types';
 import { relationFilterOperators } from '@orz-people-platform/types';
 
-import { parseVisibleIf } from './visible-if';
+import { evaluateVisibleIf, parseVisibleIf } from './visible-if';
 
 /** Form item ID 格式：q_ + UUID v4。 */
 const formItemIdPattern = /^q_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const filterOperators = new Set<RelationFilterOperator>(relationFilterOperators);
+
+/** oneOf 选项投影（框架无关）。 */
+export interface FormChoiceOption {
+  label: string;
+  value: string | number;
+}
 
 /** 将 unknown 断言为 Record 类型。 */
 function asRecord(value: unknown, name: string): Record<string, unknown> {
@@ -18,6 +29,11 @@ function asRecord(value: unknown, name: string): Record<string, unknown> {
     throw new TypeError(`${name} must be an object`);
   }
   return value as Record<string, unknown>;
+}
+
+/** 软判断：值为普通对象（非数组、非 null）。 */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** 断言对象仅包含指定 key。 */
@@ -81,9 +97,10 @@ function validateFilter(value: unknown, itemIds: ReadonlySet<string>): void {
   assertKeys(filter, ['all', 'any'], 'relation filter');
   const groups = ['all', 'any'].filter((key) => Object.hasOwn(filter, key));
   if (groups.length !== 1) throw new TypeError('relation filter requires exactly one of all or any');
-  const conditions = filter[groups[0]];
+  const groupKey = groups[0] as 'all' | 'any';
+  const conditions = filter[groupKey];
   if (!Array.isArray(conditions) || conditions.length === 0) {
-    throw new TypeError(`relation filter ${groups[0]} must be a non-empty array`);
+    throw new TypeError(`relation filter ${groupKey} must be a non-empty array`);
   }
   conditions.forEach((condition) => validateFilterCondition(condition, itemIds));
 }
@@ -209,4 +226,95 @@ export function validateFormSchemaExtensions(
   });
 
   validateRootExtension(root['x-orz'], itemIds);
+}
+
+// ---- 读路径（软解析，供渲染 / 提交映射；非法结构返回 null / 空值）----
+
+/** 解析多语言文案：优先 locale，其次 zh-CN，否则取第一个值。 */
+export function resolveLocalizedText(
+  map: LocalizedText | undefined,
+  locale = 'zh-CN',
+): string | undefined {
+  if (!map) return undefined;
+  if (typeof map[locale] === 'string') return map[locale];
+  if (typeof map['zh-CN'] === 'string') return map['zh-CN'];
+  return Object.values(map).find((value) => typeof value === 'string');
+}
+
+/** 读取 Form 根 x-orz 扩展；结构不符时返回 null。 */
+export function getRootExtension(schema: JsonSchema): FormRootExtension | null {
+  if (!isRecord(schema)) return null;
+  const extension = schema['x-orz'];
+  if (!isRecord(extension) || extension.version !== 1) return null;
+  if (typeof extension.datasetId !== 'string' || !Array.isArray(extension.layout)) return null;
+  return extension as unknown as FormRootExtension;
+}
+
+/** 读取 Form item 的 x-orz 扩展。 */
+export function getItemExtension(property: unknown): FormItemExtension | null {
+  if (!isRecord(property)) return null;
+  const extension = property['x-orz'];
+  if (!isRecord(extension) || typeof extension.datasetFieldId !== 'string') return null;
+  return extension as unknown as FormItemExtension;
+}
+
+/** 读取 schema.properties 映射。 */
+export function getSchemaProperties(
+  schema: JsonSchema,
+): Record<string, JsonSchemaObject> | null {
+  if (!isRecord(schema) || !isRecord(schema.properties)) return null;
+  return schema.properties as Record<string, JsonSchemaObject>;
+}
+
+/** 读取根 required 列表。 */
+export function getRequiredItemIds(schema: JsonSchema): ReadonlySet<string> {
+  if (!isRecord(schema) || !Array.isArray(schema.required)) return new Set();
+  return new Set(schema.required.filter((id): id is string => typeof id === 'string'));
+}
+
+/** 从 oneOf const + choice i18n 推导选项列表。 */
+export function getChoiceOptions(
+  property: unknown,
+  locale = 'zh-CN',
+): FormChoiceOption[] {
+  if (!isRecord(property) || !Array.isArray(property.oneOf)) return [];
+  return property.oneOf.flatMap((rawChoice) => {
+    if (!isRecord(rawChoice) || rawChoice.const === undefined) return [];
+    const value = rawChoice.const;
+    if (typeof value !== 'string' && typeof value !== 'number') return [];
+    const extension = isRecord(rawChoice['x-orz']) ? rawChoice['x-orz'] : undefined;
+    const i18n = extension && isRecord(extension.i18n) ? extension.i18n : undefined;
+    const titleMap = i18n && isRecord(i18n.title) ? i18n.title as LocalizedText : undefined;
+    const label = resolveLocalizedText(titleMap, locale) ?? String(value);
+    return [{ label, value }];
+  });
+}
+
+/** 判断 item 在当前 state 下是否可见。 */
+export function isItemVisible(
+  extension: FormItemExtension | null,
+  state: Readonly<Record<string, JsonValue | undefined>>,
+): boolean {
+  if (!extension?.visibleIf) return true;
+  return evaluateVisibleIf(extension.visibleIf, state);
+}
+
+/** 读取单个 property 的默认值。 */
+export function getPropertyDefault(property: unknown): JsonValue | undefined {
+  if (!isRecord(property) || !('default' in property)) return undefined;
+  return property.default as JsonValue;
+}
+
+/** 根据 schema 初始化表单 state（仅填充有 default 的项）。 */
+export function createInitialFormState(
+  schema: JsonSchema,
+): Record<FormItemId, JsonValue | undefined> {
+  const properties = getSchemaProperties(schema);
+  if (!properties) return {};
+  return Object.fromEntries(
+    Object.entries(properties).flatMap(([itemId, property]) => {
+      const value = getPropertyDefault(property);
+      return value === undefined ? [] : [[itemId, value]];
+    }),
+  );
 }

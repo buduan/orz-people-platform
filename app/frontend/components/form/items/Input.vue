@@ -18,12 +18,18 @@ interface InputProps {
 const props = defineProps<InputProps>();
 const model = defineModel<InputValue>({ default: '' });
 
-const inputModel = computed<string | number>({
+const inputModel = computed<string>({
   get: () => {
-    if (typeof model.value === 'string' || typeof model.value === 'number') return model.value;
+    if (typeof model.value === 'string') return model.value;
+    if (typeof model.value === 'number') return String(model.value);
     return '';
   },
   set: (value) => {
+    if (props.type === 'number') {
+      const parsed = value === '' ? null : Number(value);
+      model.value = parsed !== null && Number.isNaN(parsed) ? value : parsed;
+      return;
+    }
     model.value = value;
   },
 });

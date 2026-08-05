@@ -1,25 +1,213 @@
 <script setup lang="ts">
-import { ref } from '#imports';
-import { useFormFieldEditingState } from '~/composables/useFormFieldEditing';
+import { computed, ref } from '#imports';
+import type { JsonSchema, JsonValue } from '@orz-people-platform/types';
+import type { FormRenderMode } from '~/components/form/types';
 
-/** 是否存在处于编辑态的字段（共享互斥上下文），驱动顶部状态指示。 */
-const { anyEditing } = useFormFieldEditingState();
+/** 固定 UUID，保证 mock schema 可重复。 */
+const ids = {
+  name: 'q_11111111-1111-4111-8111-111111111111',
+  email: 'q_22222222-2222-4222-8222-222222222222',
+  dept: 'q_33333333-3333-4333-8333-333333333333',
+  skills: 'q_44444444-4444-4444-8444-444444444444',
+  bio: 'q_55555555-5555-4555-8555-555555555555',
+  notifyDetail: 'q_66666666-6666-4666-8666-666666666666',
+  tags: 'q_77777777-7777-4777-8777-777777777777',
+} as const;
 
-// 演示用表单值（模拟编辑已有行时的预填内容）。
-const fullName = ref('林晚晴');
-const email = ref('wanqing.lin@example.com');
-const department = ref('engineering');
-const notify = ref(true);
-const bio = ref(
-  '负责表单与数据集模块的前端研发，关注表单渲染引擎的性能与可访问性。',
-);
+const mockSchema: JsonSchema = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    [ids.name]: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 64,
+      default: '林晚晴',
+      'x-orz': {
+        datasetFieldId: 'fld_name',
+        i18n: {
+          title: { 'zh-CN': '姓名' },
+          description: { 'zh-CN': '填写成员在本工作区使用的姓名。' },
+          placeholder: { 'zh-CN': '输入姓名' },
+        },
+        ui: { widget: 'input' },
+      },
+    },
+    [ids.email]: {
+      type: 'string',
+      format: 'email',
+      default: 'wanqing.lin@example.com',
+      'x-orz': {
+        datasetFieldId: 'fld_email',
+        i18n: {
+          title: { 'zh-CN': '邮箱' },
+          placeholder: { 'zh-CN': 'name@example.com' },
+        },
+        ui: { widget: 'input' },
+      },
+    },
+    [ids.dept]: {
+      type: 'string',
+      default: 'engineering',
+      oneOf: [
+        {
+          const: 'engineering',
+          'x-orz': { i18n: { title: { 'zh-CN': '产品研发部' } } },
+        },
+        {
+          const: 'design',
+          'x-orz': { i18n: { title: { 'zh-CN': '设计与体验部' } } },
+        },
+        {
+          const: 'marketing',
+          'x-orz': { i18n: { title: { 'zh-CN': '市场运营部' } } },
+        },
+        {
+          const: 'hr',
+          'x-orz': { i18n: { title: { 'zh-CN': '人力资源部' } } },
+        },
+      ],
+      'x-orz': {
+        datasetFieldId: 'fld_dept',
+        i18n: {
+          title: { 'zh-CN': '所属部门' },
+          description: { 'zh-CN': '单选：Radio 选项组。' },
+        },
+        ui: { widget: 'radio' },
+      },
+    },
+    [ids.skills]: {
+      type: 'array',
+      items: { type: 'string' },
+      default: ['vue', 'typescript'],
+      oneOf: [
+        {
+          const: 'vue',
+          'x-orz': { i18n: { title: { 'zh-CN': 'Vue' } } },
+        },
+        {
+          const: 'typescript',
+          'x-orz': { i18n: { title: { 'zh-CN': 'TypeScript' } } },
+        },
+        {
+          const: 'nestjs',
+          'x-orz': { i18n: { title: { 'zh-CN': 'NestJS' } } },
+        },
+        {
+          const: 'design',
+          'x-orz': { i18n: { title: { 'zh-CN': '设计系统' } } },
+        },
+      ],
+      'x-orz': {
+        datasetFieldId: 'fld_skills',
+        i18n: {
+          title: { 'zh-CN': '技能标签' },
+          description: { 'zh-CN': '多选：Checkbox 选项组。' },
+        },
+        ui: { widget: 'checkbox' },
+      },
+    },
+    [ids.bio]: {
+      type: 'string',
+      maxLength: 500,
+      default: '负责表单与数据集模块的前端研发。',
+      'x-orz': {
+        datasetFieldId: 'fld_bio',
+        i18n: {
+          title: { 'zh-CN': '个人简介' },
+          placeholder: { 'zh-CN': '简单介绍一下自己' },
+        },
+        ui: { widget: 'textarea' },
+      },
+    },
+    [ids.notifyDetail]: {
+      type: 'string',
+      oneOf: [
+        {
+          const: 'email',
+          'x-orz': { i18n: { title: { 'zh-CN': '邮件' } } },
+        },
+        {
+          const: 'sms',
+          'x-orz': { i18n: { title: { 'zh-CN': '短信' } } },
+        },
+        {
+          const: 'none',
+          'x-orz': { i18n: { title: { 'zh-CN': '不接收' } } },
+        },
+      ],
+      'x-orz': {
+        datasetFieldId: 'fld_notify',
+        i18n: {
+          title: { 'zh-CN': '通知偏好' },
+          description: { 'zh-CN': '仅当部门为「产品研发部」时显示（visibleIf）。' },
+          placeholder: { 'zh-CN': '选择通知方式' },
+        },
+        ui: { widget: 'selector' },
+        visibleIf: {
+          fieldId: ids.dept,
+          operator: 'equals',
+          value: 'engineering',
+        },
+      },
+    },
+    [ids.tags]: {
+      type: 'array',
+      items: { type: 'string' },
+      default: ['表单引擎'],
+      'x-orz': {
+        datasetFieldId: 'fld_tags',
+        i18n: {
+          title: { 'zh-CN': '自定义标签' },
+          placeholder: { 'zh-CN': '输入后回车添加' },
+        },
+        ui: { widget: 'tags-input' },
+      },
+    },
+  },
+  required: [ids.name, ids.email, ids.dept],
+  'x-orz': {
+    version: 1,
+    datasetId: 'ds_preview',
+    layout: [
+      {
+        id: 'intro',
+        type: 'markdown',
+        markdown: {
+          'zh-CN': '这是由 mock JSON Schema 驱动的 FormRenderer 预览。切换下方模式观察编辑态与填写态。',
+        },
+      },
+      {
+        id: 'basic',
+        type: 'section',
+        title: { 'zh-CN': '基本信息' },
+        children: [ids.name, ids.email, ids.dept],
+      },
+      {
+        id: 'profile',
+        type: 'section',
+        title: { 'zh-CN': '资料与偏好' },
+        children: [ids.skills, ids.bio, ids.notifyDetail, ids.tags],
+      },
+    ],
+    capture: {},
+  },
+};
 
-const departmentItems = [
-  { label: '产品研发部', value: 'engineering' },
-  { label: '设计与体验部', value: 'design' },
-  { label: '市场运营部', value: 'marketing' },
-  { label: '人力资源部', value: 'hr' },
-];
+const mode = ref<FormRenderMode>('edit');
+const state = ref<Record<string, JsonValue | undefined>>({});
+const selectedFieldId = ref<string | null>(null);
+
+const modeLabel = computed(() => (mode.value === 'edit' ? '编辑态' : '填写态'));
+
+const stateJson = computed(() => JSON.stringify(state.value, null, 2));
+
+const lastAction = ref<string>('无');
+
+function onFieldAction(action: string, fieldId: string): void {
+  lastAction.value = `${action} → ${fieldId}`;
+}
 </script>
 
 <template>
@@ -34,7 +222,7 @@ const departmentItems = [
             size="sm"
           />
           <code class="text-xs font-semibold text-muted">
-            FormField.vue
+            FormRenderer.vue
           </code>
         </div>
 
@@ -42,7 +230,7 @@ const departmentItems = [
           <h1
             class="text-3xl font-bold tracking-[-0.035em] text-highlighted sm:text-4xl"
           >
-            FormField 表单字段
+            Form 渲染层
           </h1>
           <UButton
             label="回到首页"
@@ -56,8 +244,8 @@ const departmentItems = [
         </div>
 
         <p class="mt-3 max-w-2xl text-base leading-7 text-muted">
-          表单字段的外层容器：自上而下依次为字段标题、描述、Form Item 与编辑操作区。
-          切换下方开关，观察展示态与编辑态下边框、阴影和编辑区的变化。
+          由 mock JSON Schema 驱动：FormRenderer → FormField → componentMap → items。
+          支持编辑 / 填写双模式与选中字段回调。
         </p>
 
         <div
@@ -67,190 +255,55 @@ const departmentItems = [
           <div class="flex items-center gap-3">
             <span
               class="size-2.5 rounded-full transition-colors duration-300"
-              :class="anyEditing
+              :class="mode === 'edit' && selectedFieldId
                 ? 'bg-primary'
                 : 'bg-neutral-300 dark:bg-neutral-600'"
             />
             <div>
               <p class="text-sm font-semibold text-highlighted">
-                {{ anyEditing ? '编辑态' : '展示态' }}
+                {{ modeLabel }}
               </p>
               <p class="mt-0.5 text-xs text-muted">
-                {{ anyEditing
-                  ? '聚焦编辑状态，展示编辑操作按钮'
-                  : '对外填写与非聚焦状态，不展示编辑区域' }}
+                选中：{{ selectedFieldId ?? '无' }}
+              </p>
+              <p class="mt-0.5 text-xs text-muted">
+                最近操作：{{ lastAction }}
               </p>
             </div>
           </div>
-          <div class="flex items-center gap-3">
-            <span class="text-sm font-medium text-muted">
-              编辑模式
-            </span>
-            <USwitch
-              v-model="anyEditing"
-              aria-label="切换展示态与编辑态"
-            />
-          </div>
+
+          <USwitch
+            v-model="mode"
+            :true-value="'edit'"
+            :false-value="'fill'"
+            label="编辑模式"
+          />
         </div>
       </header>
 
-      <section
-        class="space-y-3"
-        aria-label="FormField 状态演示"
-      >
-        <FormField
-          title="姓名"
-          description="填写成员在本工作区使用的姓名。"
-          allow-edit
-        >
-          <UInput
-            v-model="fullName"
-            placeholder="输入姓名"
-            class="w-full max-w-[16rem]"
-          />
-        </FormField>
+      <FormRenderer
+        v-model="state"
+        v-model:selected-field-id="selectedFieldId"
+        :schema="mockSchema"
+        :mode="mode"
+        class="rounded-2xl border border-default bg-elevated p-4 sm:p-6"
+        @up="onFieldAction('up', $event)"
+        @down="onFieldAction('down', $event)"
+        @duplicate="onFieldAction('duplicate', $event)"
+        @settings="onFieldAction('settings', $event)"
+        @delete="onFieldAction('delete', $event)"
+        @update:title="(id, value) => onFieldAction(`title:${value}`, id)"
+        @update:description="(id, value) => onFieldAction(`description:${value ?? ''}`, id)"
+      />
 
-        <FormField
-          title="邮箱"
-          description="用于接收通知与身份验证的联系方式。"
-          allow-edit
-        >
-          <UInput
-            v-model="email"
-            type="email"
-            placeholder="name@example.com"
-            class="w-full max-w-[16rem]"
-          />
-        </FormField>
-
-        <FormField
-          title="所属部门"
-          allow-edit
-        >
-          <USelect
-            v-model="department"
-            :items="departmentItems"
-            placeholder="选择所属部门"
-            class="w-full max-w-[16rem]"
-          />
-        </FormField>
-
-        <FormField
-          title="通知偏好"
-          description="控制工作区消息的接收方式。"
-          allow-edit
-        >
-          <UCheckbox
-            v-model="notify"
-            label="接收新表单提交通知"
-          />
-        </FormField>
-
-        <FormField
-          title="个人简介"
-          description="一句话介绍，将展示在成员资料页。"
-          allow-edit
-        >
-          <UTextarea
-            v-model="bio"
-            placeholder="写点什么……"
-            class="w-full"
-          />
-        </FormField>
-      </section>
-
-      <section class="mt-12">
-        <UCard
-          class="rounded-2xl border-default bg-default shadow-sm"
-          :ui="{ body: 'space-y-8' }"
-        >
-          <template #header>
-            <div class="flex items-center gap-3">
-              <UIcon
-                name="i-solar-code-square-bold-duotone"
-                class="size-5 text-primary"
-              />
-              <h2 class="text-sm font-bold text-highlighted">
-                组件 API
-              </h2>
-            </div>
-          </template>
-
-          <div>
-            <p class="text-xs font-bold uppercase tracking-[0.16em] text-muted">
-              Props
-            </p>
-            <dl class="mt-3 divide-y divide-default text-sm">
-              <div
-                class="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-4 py-3 first:pt-0
-                  last:pb-0"
-              >
-                <dt class="font-mono font-semibold text-toned">
-                  title
-                </dt>
-                <dd class="text-muted">
-                  字段标题（必填），以 <code>text-lg font-bold</code> 渲染
-                </dd>
-              </div>
-              <div class="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-4 py-3">
-                <dt class="font-mono font-semibold text-toned">
-                  description
-                </dt>
-                <dd class="text-muted">
-                  字段描述（可选），以次要灰色 <code>text-sm</code> 渲染；为空时不展示
-                </dd>
-              </div>
-              <div class="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-4 py-3 last:pb-0">
-                <dt class="font-mono font-semibold text-toned">
-                  allow-edit
-                </dt>
-                <dd class="text-muted">
-                  允许点击编辑（可选）；传入后点击字段卡片即进入编辑态，未编辑时悬停显示可点击提示。编辑态由共享互斥上下文派生，同一时刻至多一个字段处于编辑态
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          <div>
-            <p class="text-xs font-bold uppercase tracking-[0.16em] text-muted">
-              Slots
-            </p>
-            <dl class="mt-3 divide-y divide-default text-sm">
-              <div
-                class="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-4 py-3 first:pt-0
-                  last:pb-0"
-              >
-                <dt class="font-mono font-semibold text-toned">
-                  default
-                </dt>
-                <dd class="text-muted">
-                  字段 Form Item 本体，如输入框、复选框等 widget
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          <div>
-            <p class="text-xs font-bold uppercase tracking-[0.16em] text-muted">
-              Editor component
-            </p>
-            <dl class="mt-3 divide-y divide-default text-sm">
-              <div
-                class="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-4 py-3 first:pt-0
-                  last:pb-0"
-              >
-                <dt class="font-mono font-semibold text-toned">
-                  FormFieldEditor
-                </dt>
-                <dd class="text-muted">
-                  编辑态底部灰色操作条，内置上移 / 下移 / 复制 / 设置 / 删除按钮；点击通过
-                  <code>up</code> / <code>down</code> / <code>duplicate</code> /
-                  <code>settings</code> / <code>delete</code> 事件通知父级
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </UCard>
+      <section class="mt-8">
+        <h2 class="text-sm font-semibold text-highlighted">
+          当前 state
+        </h2>
+        <pre
+          class="mt-3 overflow-x-auto rounded-xl border border-default bg-default
+            p-4 text-xs leading-5 text-muted"
+        >{{ stateJson }}</pre>
       </section>
     </div>
   </main>

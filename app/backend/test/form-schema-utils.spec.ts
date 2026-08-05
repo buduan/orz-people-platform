@@ -8,8 +8,15 @@ import {
   canonicalizeJson,
   checksumJson,
   createFormItemId,
+  createInitialFormState,
   evaluateVisibleIf,
+  getChoiceOptions,
+  getItemExtension,
+  getRequiredItemIds,
+  getRootExtension,
+  isItemVisible,
   parseVisibleIf,
+  resolveLocalizedText,
   validateFormSchemaExtensions,
 } from '@orz-people-platform/utils';
 
@@ -141,5 +148,52 @@ describe('shared Form Schema utilities', () => {
     missingReference.properties[dependentId]['x-orz'].visibleIf.fieldId = 'q_missing';
     expect(() => validateFormSchemaExtensions(missingReference))
       .toThrow('Unknown visibleIf Form item');
+  });
+
+  it('soft-reads extensions, choices, locale text, and defaults without throwing', () => {
+    const itemId = 'q_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const schema = {
+      type: 'object',
+      properties: {
+        [itemId]: {
+          type: 'string',
+          default: 'engineering',
+          oneOf: [
+            {
+              const: 'engineering',
+              'x-orz': { i18n: { title: { 'zh-CN': '研发', en: 'Eng' } } },
+            },
+            { const: 'design' },
+          ],
+          'x-orz': {
+            datasetFieldId: 'fld_dept',
+            i18n: { title: { 'zh-CN': '部门', en: 'Dept' } },
+            ui: { widget: 'radio' },
+            visibleIf: { fieldId: itemId, operator: 'is_not_empty' },
+          },
+        },
+      },
+      required: [itemId],
+      'x-orz': {
+        version: 1,
+        datasetId: 'ds_1',
+        layout: [{ id: 's1', type: 'section', children: [itemId] }],
+        capture: {},
+      },
+    };
+
+    expect(resolveLocalizedText({ en: 'Hello', 'zh-CN': '你好' }, 'en')).toBe('Hello');
+    expect(resolveLocalizedText({ en: 'Hello' }, 'zh-CN')).toBe('Hello');
+    expect(getRootExtension(schema)?.datasetId).toBe('ds_1');
+    expect(getItemExtension(schema.properties[itemId])?.ui?.widget).toBe('radio');
+    expect(getRequiredItemIds(schema).has(itemId)).toBe(true);
+    expect(getChoiceOptions(schema.properties[itemId], 'zh-CN')).toEqual([
+      { label: '研发', value: 'engineering' },
+      { label: 'design', value: 'design' },
+    ]);
+    expect(createInitialFormState(schema)).toEqual({ [itemId]: 'engineering' });
+    expect(isItemVisible(getItemExtension(schema.properties[itemId]), { [itemId]: 'x' })).toBe(true);
+    expect(isItemVisible(getItemExtension(schema.properties[itemId]), {})).toBe(false);
+    expect(getRootExtension(true)).toBeNull();
   });
 });
