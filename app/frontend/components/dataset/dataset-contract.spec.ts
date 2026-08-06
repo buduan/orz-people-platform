@@ -1,0 +1,29 @@
+import { describe, expectTypeOf, it } from 'vitest';
+import type {
+  DatasetCellCommitPayload,
+  DatasetGroupSummary,
+  DatasetRowRange,
+  DatasetSelection,
+  DatasetTableEmits,
+  DatasetTableProps,
+  DatasetTableRow,
+} from './types';
+
+describe('DatasetTable controlled contract', () => {
+  it('types sparse props as parent-owned inputs', () => {
+    expectTypeOf<DatasetTableProps['rowSlots']>()
+      .toEqualTypeOf<Readonly<Record<number, DatasetTableRow | undefined>>>();
+    expectTypeOf<DatasetTableProps['groupDirectory']>()
+      .toEqualTypeOf<DatasetGroupSummary[] | null | undefined>();
+  });
+
+  it('types query, range, mutation and selection intents explicitly', () => {
+    expectTypeOf<DatasetTableEmits['cell-commit-request']>()
+      .toEqualTypeOf<[payload: DatasetCellCommitPayload]>();
+    expectTypeOf<DatasetTableEmits['window-range-request']>()
+      .toEqualTypeOf<[ranges: DatasetRowRange[]]>();
+    expectTypeOf<DatasetTableEmits['selection-change']>()
+      .toEqualTypeOf<[selection: DatasetSelection]>();
+    expectTypeOf<DatasetCellCommitPayload['expectedRevision']>().toEqualTypeOf<number>();
+  });
+});
