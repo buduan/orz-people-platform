@@ -10,6 +10,7 @@
 - 用户与 Workspace：用户资料、用户状态、默认 Workspace（ID 为 `1`）、成员状态、系统 `guest`/`member` 类型和自定义成员类型。
 - 授权：Workspace 角色、角色权限、成员直接 `allow`/`deny` 授权、Workspace 管理员和系统管理员。
 - 审计：重要的认证、成员、权限和管理操作写入 PostgreSQL 的 append-only `AuditLog`。
+- 邮件：Power Automate webhook 通道，系统管理员可配置 URL（存于 Redis key `settings:email:power-automate:webhook-url`），用于发送邮箱验证码等通知；`/mail/config` 与 `/mail/test` 受 `system_admin` 权限保护。
 
 ## 已实现但暂未暴露 HTTP API 的领域能力
 
@@ -28,4 +29,4 @@
 - 认证状态、Access/Refresh Token Cookie 持久化、API 响应解包、统一错误处理和安全重定向。
 - 响应式 Dashboard 布局预览：桌面侧栏折叠、移动端 Slideover、Workspace 切换器和用户面板。
 
-`/dashboard` 当前是布局调试页。`/people`、`/organization`、`/access` 和 `/settings` 目前只是导航目标，尚未提供对应页面。
+`/dashboard` 当前是布局调试页。`/people`、`/organization`、`/access` 目前只是导航目标，尚未提供对应页面。`/settings` 已提供 Power Automate 邮件 webhook 配置与测试（仅系统管理员）。
