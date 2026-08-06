@@ -201,7 +201,7 @@ pnpm start
 | `/workspaces/:workspaceId/roles` | 角色、角色权限、成员角色和直接权限 |
 | `/system-administrators` | 系统管理员授予、撤销和查询 |
 | `/audit-logs` | 受权限保护的审计查询 |
-| `/mail/*` | Power Automate 邮件 webhook 配置与测试（系统管理员） |
+| `/mail/*` | Power Automate 邮件 webhook 配置（系统管理员，发送本身不暴露路由） |
 
 运行中的 Swagger 文档由 NestJS 根据当前 Controller 生成。`app/backend/api/openapi.yml` 是仓库中的静态契约文件；Dataset/Form 领域模块目前没有 HTTP Controller，因此不应从该文件推断出完整的领域 API。
 
