@@ -8,7 +8,7 @@
 - 登录与会话：密码登录、邮箱验证码登录、Access JWT、Redis Refresh Session、单次 Refresh Token 轮换和重放检测。
 - 进阶认证：Passkey、邮箱/SMS/TOTP MFA、密码修改、密码重置、已验证手机号绑定和会话管理。
 - 用户与 Workspace：用户资料、用户状态、默认 Workspace（ID 为 `1`）、成员状态、系统 `guest`/`member` 类型和自定义成员类型。
-- 授权：Workspace 角色、角色权限、成员直接 `allow`/`deny` 授权、Workspace 管理员和系统管理员。
+- 授权：Workspace 角色、角色权限、成员直接 `allow`/`deny` 授权、Workspace 管理员和系统管理员；`GET /user/permission` 返回当前用户解析后的 actor（有效权限与管理员标记）。
 - 审计：重要的认证、成员、权限和管理操作写入 PostgreSQL 的 append-only `AuditLog`。
 - 邮件：Power Automate webhook 通道，系统管理员可配置 URL（存于 Redis key `settings:email:power-automate:webhook-url`），用于发送邮箱验证码等通知；`GET/PUT /mail/config` 受 `system_admin` 保护，邮件发送本身不对外暴露 HTTP 路由。
 
