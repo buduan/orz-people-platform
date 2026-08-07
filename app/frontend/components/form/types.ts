@@ -1,7 +1,6 @@
 import type { ComponentPublicInstance } from 'vue';
 import type {
   FormItemId,
-  FormLayoutNode,
   JsonSchema,
   JsonValue,
 } from '@orz-people-platform/types';
@@ -29,4 +28,4 @@ export interface FormRenderContext {
   state: Record<FormItemId, JsonValue | undefined>;
 }
 
-export type { FormLayoutNode };
+export type { FormItemId, JsonSchema, JsonValue };

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable vue/valid-v-for -- recursive FormField keys use schema ids */
 import {
   computed,
   inject,
@@ -7,7 +6,7 @@ import {
   ref,
   type Ref,
 } from '#imports';
-import type { FormLayoutNode, JsonValue } from '@orz-people-platform/types';
+import type { JsonValue } from '@orz-people-platform/types';
 import {
   getChoiceOptions,
   getItemExtension,
@@ -30,10 +29,8 @@ import type {
 defineOptions({ name: 'FormField' });
 
 const props = defineProps<{
-  /** 稳定字段 id：itemId 或 layout node id。 */
+  /** 稳定字段 id —— 即 JSON Schema 的 property key。 */
   fieldId: string;
-  /** 布局节点；缺省时按 item 叶子渲染。 */
-  layoutNode?: FormLayoutNode;
   allowEdit?: boolean;
   description?: string;
   title?: string;
@@ -68,44 +65,26 @@ const requiredIds = computed(() => (
   schema.value ? getRequiredItemIds(schema.value) : new Set<string>()
 ));
 
-const isLayout = computed(() => props.layoutNode !== undefined);
-const isSection = computed(() => props.layoutNode?.type === 'section');
-const isMarkdown = computed(() => props.layoutNode?.type === 'markdown');
-const isItem = computed(() => !isLayout.value);
-
-const property = computed(() => (
-  isItem.value ? properties.value?.[props.fieldId] : undefined
-));
+const property = computed(() => properties.value?.[props.fieldId]);
 const itemExtension = computed(() => getItemExtension(property.value));
 
-const visible = computed(() => {
-  if (!isItem.value) return true;
-  return isItemVisible(itemExtension.value, state.value ?? {});
-});
+const visible = computed(() =>
+  isItemVisible(itemExtension.value, state.value ?? {}),
+);
 
 const resolvedTitle = computed(() => {
   if (props.title !== undefined) return props.title;
-  if (props.layoutNode) {
-    return resolveLocalizedText(props.layoutNode.title, locale.value) ?? props.layoutNode.id;
-  }
   return resolveLocalizedText(itemExtension.value?.i18n?.title, locale.value) ?? props.fieldId;
 });
 
 const resolvedDescription = computed(() => {
   if (props.description !== undefined) return props.description;
-  if (props.layoutNode) return undefined;
   return resolveLocalizedText(itemExtension.value?.i18n?.description, locale.value);
 });
 
-const markdownContent = computed(() => (
-  props.layoutNode
-    ? (resolveLocalizedText(props.layoutNode.markdown, locale.value) ?? '')
-    : ''
-));
-
 const fieldName = computed(() => props.name ?? props.fieldId);
 const fieldRequired = computed(() => (
-  props.required ?? (isItem.value && requiredIds.value.has(props.fieldId))
+  props.required ?? requiredIds.value.has(props.fieldId)
 ));
 
 const widgetName = computed(() => resolveWidgetName(itemExtension.value?.ui?.widget));
@@ -231,18 +210,16 @@ function emitDelete(): void { emit('delete', props.fieldId); }
   >
     <div class="p-4">
       <div
-        v-if="!isMarkdown"
         class="flex items-start gap-2"
         @click.stop
       >
         <h3
           v-if="!titleEditing"
           class="text-lg font-bold text-highlighted"
-          :class="isSection ? 'text-xl' : ''"
         >
           {{ resolvedTitle }}
           <span
-            v-if="fieldRequired && isItem"
+            v-if="fieldRequired"
             class="text-error"
           >*</span>
         </h3>
@@ -274,7 +251,7 @@ function emitDelete(): void { emit('delete', props.fieldId); }
       </div>
 
       <div
-        v-if="showDescriptionRow && !isMarkdown"
+        v-if="showDescriptionRow"
         class="mt-1 flex items-start gap-2"
         @click.stop
       >
@@ -310,41 +287,8 @@ function emitDelete(): void { emit('delete', props.fieldId); }
         />
       </div>
 
-      <!-- markdown 布局节点 -->
-      <div
-        v-if="isMarkdown"
-        class="prose prose-sm max-w-none text-muted dark:prose-invert"
-        @click.stop
-      >
-        <p class="whitespace-pre-wrap text-sm leading-6">
-          {{ markdownContent }}
-        </p>
-      </div>
-
-      <!-- section：递归渲染子 FormField -->
-      <div
-        v-else-if="isSection"
-        class="mt-3 space-y-3"
-        @click.stop
-      >
-        <FormField
-          v-for="childId in layoutNode?.children ?? []"
-          :key="childId"
-          :field-id="childId"
-          :allow-edit="allowEdit"
-          @up="emit('up', $event)"
-          @down="emit('down', $event)"
-          @duplicate="emit('duplicate', $event)"
-          @settings="emit('settings', $event)"
-          @delete="emit('delete', $event)"
-          @update:title="(id, value) => emit('update:title', id, value)"
-          @update:description="(id, value) => emit('update:description', id, value)"
-        />
-      </div>
-
       <!-- 叶子 item：UFormField + componentMap -->
       <div
-        v-else-if="isItem"
         class="mt-3"
         @click.stop
       >

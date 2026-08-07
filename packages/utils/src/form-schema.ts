@@ -7,11 +7,11 @@ import type {
   JsonValue,
   LocalizedText,
   RelationFilterOperator,
-  VisibleIfExpression,
+  AvailableIfExpression,
 } from '@orz-people-platform/types';
 import { relationFilterOperators } from '@orz-people-platform/types';
 
-import { evaluateVisibleIf, parseVisibleIf } from './visible-if';
+import { evaluateAvailableIf, parseAvailableIf } from './visible-if';
 
 /** Form item ID 格式：q_ + UUID v4。 */
 const formItemIdPattern = /^q_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -119,51 +119,29 @@ function validateUi(value: unknown, itemIds: ReadonlySet<string>): void {
   if (options.filter !== undefined) validateFilter(options.filter, itemIds);
 }
 
-/** 递归收集 visibleIf 表达式中引用的所有 fieldId。 */
-function referencedVisibleIfFields(expression: VisibleIfExpression): string[] {
-  if ('conditions' in expression) return expression.conditions.flatMap(referencedVisibleIfFields);
-  if ('condition' in expression) return referencedVisibleIfFields(expression.condition);
+/** 递归收集 availableIf 表达式中引用的所有 fieldId。 */
+function referencedAvailableIfFields(expression: AvailableIfExpression): string[] {
+  if ('conditions' in expression) return expression.conditions.flatMap(referencedAvailableIfFields);
+  if ('condition' in expression) return referencedAvailableIfFields(expression.condition);
   return [expression.fieldId];
 }
 
-/** 校验单个 Form item 的 x-orz 扩展。 */
+/** 校验单个 Form item 的 x-form 扩展。 */
 function validateItemExtension(
   value: unknown,
   itemIds: ReadonlySet<string>,
 ): void {
-  const extension = asRecord(value, 'Form item x-orz');
-  assertKeys(extension, ['datasetFieldId', 'i18n', 'ui', 'visibleIf'], 'Form item x-orz');
+  const extension = asRecord(value, 'Form item x-form');
+  assertKeys(extension, ['datasetFieldId', 'i18n', 'ui', 'availableIf'], 'Form item x-form');
   assertString(extension.datasetFieldId, 'Form item datasetFieldId');
   if (extension.i18n !== undefined) validateI18n(extension.i18n, 'Form item i18n');
   if (extension.ui !== undefined) validateUi(extension.ui, itemIds);
-  if (extension.visibleIf !== undefined) {
-    const expression = parseVisibleIf(extension.visibleIf);
-    // visibleIf 引用的 Form item ID 必须存在。
-    const missing = referencedVisibleIfFields(expression).find((fieldId) => !itemIds.has(fieldId));
-    if (missing) throw new TypeError(`Unknown visibleIf Form item: ${missing}`);
+  if (extension.availableIf !== undefined) {
+    const expression = parseAvailableIf(extension.availableIf);
+    // availableIf 引用的 Form item ID 必须存在。
+    const missing = referencedAvailableIfFields(expression).find((fieldId) => !itemIds.has(fieldId));
+    if (missing) throw new TypeError(`Unknown availableIf Form item: ${missing}`);
   }
-}
-
-/** 校验 Form 根布局：section 和 markdown 节点的 children 引用必须存在。 */
-function validateLayout(value: unknown, itemIds: ReadonlySet<string>): void {
-  if (!Array.isArray(value)) throw new TypeError('Form root layout must be an array');
-  value.forEach((rawNode) => {
-    const node = asRecord(rawNode, 'Form layout node');
-    assertKeys(node, ['children', 'id', 'markdown', 'title', 'type'], 'Form layout node');
-    assertString(node.id, 'Form layout node id');
-    if (node.type !== 'markdown' && node.type !== 'section') {
-      throw new TypeError('Form layout node type must be markdown or section');
-    }
-    if (node.title !== undefined) validateLocaleMap(node.title, 'Form layout title');
-    if (node.markdown !== undefined) validateLocaleMap(node.markdown, 'Form layout markdown');
-    if (node.children !== undefined) {
-      if (!Array.isArray(node.children) || !node.children.every((id) => typeof id === 'string')) {
-        throw new TypeError('Form layout children must be Form item IDs');
-      }
-      const missing = node.children.find((id) => !itemIds.has(id));
-      if (missing) throw new TypeError(`Unknown Form layout item: ${missing}`);
-    }
-  });
 }
 
 /** 校验设备采集设置：仅允许 browser、operatingSystem、userAgent 三个键。 */
@@ -177,37 +155,36 @@ function validateCapture(value: unknown): void {
   });
 }
 
-/** 校验 Form 根 x-orz 扩展：版本号、datasetId、布局、采集设置。 */
-function validateRootExtension(value: unknown, itemIds: ReadonlySet<string>): void {
-  const extension = asRecord(value, 'Form root x-orz');
-  assertKeys(extension, ['capture', 'datasetId', 'layout', 'version'], 'Form root x-orz');
-  if (extension.version !== 1) throw new TypeError('Form root x-orz version must be 1');
+/** 校验 Form 根 x-form 扩展：版本号、datasetId、采集设置。 */
+function validateRootExtension(value: unknown): void {
+  const extension = asRecord(value, 'Form root x-form');
+  assertKeys(extension, ['capture', 'datasetId', 'version'], 'Form root x-form');
+  if (extension.version !== 1) throw new TypeError('Form root x-form version must be 1');
   assertString(extension.datasetId, 'Form root datasetId');
-  validateLayout(extension.layout, itemIds);
   validateCapture(extension.capture);
 }
 
-/** 校验 oneOf 选项的 x-orz 扩展（i18n 文案）。 */
+/** 校验 oneOf 选项的 x-form 扩展（i18n 文案）。 */
 function validateChoiceExtensions(schema: Record<string, unknown>): void {
   if (!Array.isArray(schema.oneOf)) return;
   schema.oneOf.forEach((rawChoice) => {
     const choice = asRecord(rawChoice, 'Form choice');
-    if (choice['x-orz'] === undefined) return;
-    const extension = asRecord(choice['x-orz'], 'Form choice x-orz');
-    assertKeys(extension, ['i18n'], 'Form choice x-orz');
+    if (choice['x-form'] === undefined) return;
+    const extension = asRecord(choice['x-form'], 'Form choice x-form');
+    assertKeys(extension, ['i18n'], 'Form choice x-form');
     validateI18n(extension.i18n, 'Form choice i18n');
   });
 }
 
 /**
- * 在标准 JSON Schema 校验通过后，校验平台 x-orz 扩展的合法性。
+ * 在标准 JSON Schema 校验通过后，校验平台 x-form 扩展的合法性。
  *
  * 校验内容：
  * - Form item ID 格式（q_ + UUID v4）
- * - 每个 property 必须有 x-orz 扩展
- * - datasetFieldId、i18n、ui、visibleIf 结构正确
- * - 布局节点引用有效
+ * - 每个 property 必须有 x-form 扩展
+ * - datasetFieldId、i18n、ui、availableIf 结构正确
  * - 采集设置仅允许已知键
+ * - properties 对象键序即字段展示顺序
  */
 export function validateFormSchemaExtensions(
   schema: JsonSchema,
@@ -220,12 +197,12 @@ export function validateFormSchemaExtensions(
 
   Object.values(properties).forEach((rawProperty) => {
     const property = asRecord(rawProperty, 'Form item Schema');
-    if (property['x-orz'] === undefined) throw new TypeError('Form item x-orz is required');
-    validateItemExtension(property['x-orz'], itemIds);
+    if (property['x-form'] === undefined) throw new TypeError('Form item x-form is required');
+    validateItemExtension(property['x-form'], itemIds);
     validateChoiceExtensions(property);
   });
 
-  validateRootExtension(root['x-orz'], itemIds);
+  validateRootExtension(root['x-form']);
 }
 
 // ---- 读路径（软解析，供渲染 / 提交映射；非法结构返回 null / 空值）----
@@ -241,19 +218,19 @@ export function resolveLocalizedText(
   return Object.values(map).find((value) => typeof value === 'string');
 }
 
-/** 读取 Form 根 x-orz 扩展；结构不符时返回 null。 */
+/** 读取 Form 根 x-form 扩展；结构不符时返回 null。 */
 export function getRootExtension(schema: JsonSchema): FormRootExtension | null {
   if (!isRecord(schema)) return null;
-  const extension = schema['x-orz'];
+  const extension = schema['x-form'];
   if (!isRecord(extension) || extension.version !== 1) return null;
-  if (typeof extension.datasetId !== 'string' || !Array.isArray(extension.layout)) return null;
+  if (typeof extension.datasetId !== 'string' || !isRecord(extension.capture)) return null;
   return extension as unknown as FormRootExtension;
 }
 
-/** 读取 Form item 的 x-orz 扩展。 */
+/** 读取 Form item 的 x-form 扩展。 */
 export function getItemExtension(property: unknown): FormItemExtension | null {
   if (!isRecord(property)) return null;
-  const extension = property['x-orz'];
+  const extension = property['x-form'];
   if (!isRecord(extension) || typeof extension.datasetFieldId !== 'string') return null;
   return extension as unknown as FormItemExtension;
 }
@@ -282,7 +259,7 @@ export function getChoiceOptions(
     if (!isRecord(rawChoice) || rawChoice.const === undefined) return [];
     const value = rawChoice.const;
     if (typeof value !== 'string' && typeof value !== 'number') return [];
-    const extension = isRecord(rawChoice['x-orz']) ? rawChoice['x-orz'] : undefined;
+    const extension = isRecord(rawChoice['x-form']) ? rawChoice['x-form'] : undefined;
     const i18n = extension && isRecord(extension.i18n) ? extension.i18n : undefined;
     const titleMap = i18n && isRecord(i18n.title) ? i18n.title as LocalizedText : undefined;
     const label = resolveLocalizedText(titleMap, locale) ?? String(value);
@@ -295,8 +272,8 @@ export function isItemVisible(
   extension: FormItemExtension | null,
   state: Readonly<Record<string, JsonValue | undefined>>,
 ): boolean {
-  if (!extension?.visibleIf) return true;
-  return evaluateVisibleIf(extension.visibleIf, state);
+  if (!extension?.availableIf) return true;
+  return evaluateAvailableIf(extension.availableIf, state);
 }
 
 /** 读取单个 property 的默认值。 */

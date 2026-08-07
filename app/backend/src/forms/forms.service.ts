@@ -363,7 +363,7 @@ export class FormsService {
     const schema = form.activeVersion.schema as Record<string, unknown>;
     const property = (schema.properties as Record<string, Record<string, unknown>>)?.[itemId];
     if (!property) throw new NotFoundException('Form item not found');
-    const extension = property['x-orz'] as Record<string, unknown>;
+    const extension = property['x-form'] as Record<string, unknown>;
     const ui = extension.ui as Record<string, unknown> | undefined;
     const options = ui?.options as Record<string, unknown> | undefined;
     const field = await this.prisma.datasetField.findUnique({
@@ -438,7 +438,7 @@ export class FormsService {
     schema: Record<string, unknown>,
     actorUserId: string,
   ): Promise<void> {
-    const root = schema['x-orz'] as Record<string, unknown> | undefined;
+    const root = schema['x-form'] as Record<string, unknown> | undefined;
     const capture = root?.capture as Record<string, { datasetFieldId: string }> | undefined;
     if (!capture || Object.keys(capture).length === 0) return;
     let created = false;

@@ -29,7 +29,6 @@ export interface WorkspaceMemberSampleDataResult {
 function buildSampleFormSchema(datasetId: string, fieldId: string): JsonValue {
   const formItemId = createFormItemId();
   return {
-    $schema: 'https://json-schema.org/draft/2020-12/schema',
     type: 'object',
     additionalProperties: false,
     properties: {
@@ -37,7 +36,7 @@ function buildSampleFormSchema(datasetId: string, fieldId: string): JsonValue {
         type: 'string',
         minLength: 1,
         maxLength: 128,
-        'x-orz': {
+        'x-form': {
           datasetFieldId: fieldId,
           i18n: {
             title: { 'zh-CN': '姓名' },
@@ -48,15 +47,9 @@ function buildSampleFormSchema(datasetId: string, fieldId: string): JsonValue {
       },
     },
     required: [formItemId],
-    'x-orz': {
+    'x-form': {
       version: 1,
       datasetId,
-      layout: [{
-        id: 'basic-information',
-        type: 'section',
-        title: { 'zh-CN': '基本信息' },
-        children: [formItemId],
-      }],
       capture: {},
     },
   };

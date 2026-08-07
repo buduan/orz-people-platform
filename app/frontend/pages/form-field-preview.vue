@@ -15,7 +15,8 @@ const ids = {
 } as const;
 
 const mockSchema: JsonSchema = {
-  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  title: 'Form 渲染层',
+  description: '由 mock JSON Schema 驱动的 FormRenderer 预览。切换下方模式观察编辑态与填写态。',
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -24,7 +25,7 @@ const mockSchema: JsonSchema = {
       minLength: 1,
       maxLength: 64,
       default: '林晚晴',
-      'x-orz': {
+      'x-form': {
         datasetFieldId: 'fld_name',
         i18n: {
           title: { 'zh-CN': '姓名' },
@@ -38,7 +39,7 @@ const mockSchema: JsonSchema = {
       type: 'string',
       format: 'email',
       default: 'wanqing.lin@example.com',
-      'x-orz': {
+      'x-form': {
         datasetFieldId: 'fld_email',
         i18n: {
           title: { 'zh-CN': '邮箱' },
@@ -51,24 +52,12 @@ const mockSchema: JsonSchema = {
       type: 'string',
       default: 'engineering',
       oneOf: [
-        {
-          const: 'engineering',
-          'x-orz': { i18n: { title: { 'zh-CN': '产品研发部' } } },
-        },
-        {
-          const: 'design',
-          'x-orz': { i18n: { title: { 'zh-CN': '设计与体验部' } } },
-        },
-        {
-          const: 'marketing',
-          'x-orz': { i18n: { title: { 'zh-CN': '市场运营部' } } },
-        },
-        {
-          const: 'hr',
-          'x-orz': { i18n: { title: { 'zh-CN': '人力资源部' } } },
-        },
+        { const: 'engineering', 'x-form': { i18n: { title: { 'zh-CN': '产品研发部' } } } },
+        { const: 'design', 'x-form': { i18n: { title: { 'zh-CN': '设计与体验部' } } } },
+        { const: 'marketing', 'x-form': { i18n: { title: { 'zh-CN': '市场运营部' } } } },
+        { const: 'hr', 'x-form': { i18n: { title: { 'zh-CN': '人力资源部' } } } },
       ],
-      'x-orz': {
+      'x-form': {
         datasetFieldId: 'fld_dept',
         i18n: {
           title: { 'zh-CN': '所属部门' },
@@ -82,24 +71,12 @@ const mockSchema: JsonSchema = {
       items: { type: 'string' },
       default: ['vue', 'typescript'],
       oneOf: [
-        {
-          const: 'vue',
-          'x-orz': { i18n: { title: { 'zh-CN': 'Vue' } } },
-        },
-        {
-          const: 'typescript',
-          'x-orz': { i18n: { title: { 'zh-CN': 'TypeScript' } } },
-        },
-        {
-          const: 'nestjs',
-          'x-orz': { i18n: { title: { 'zh-CN': 'NestJS' } } },
-        },
-        {
-          const: 'design',
-          'x-orz': { i18n: { title: { 'zh-CN': '设计系统' } } },
-        },
+        { const: 'vue', 'x-form': { i18n: { title: { 'zh-CN': 'Vue' } } } },
+        { const: 'typescript', 'x-form': { i18n: { title: { 'zh-CN': 'TypeScript' } } } },
+        { const: 'nestjs', 'x-form': { i18n: { title: { 'zh-CN': 'NestJS' } } } },
+        { const: 'design', 'x-form': { i18n: { title: { 'zh-CN': '设计系统' } } } },
       ],
-      'x-orz': {
+      'x-form': {
         datasetFieldId: 'fld_skills',
         i18n: {
           title: { 'zh-CN': '技能标签' },
@@ -112,7 +89,7 @@ const mockSchema: JsonSchema = {
       type: 'string',
       maxLength: 500,
       default: '负责表单与数据集模块的前端研发。',
-      'x-orz': {
+      'x-form': {
         datasetFieldId: 'fld_bio',
         i18n: {
           title: { 'zh-CN': '个人简介' },
@@ -124,28 +101,19 @@ const mockSchema: JsonSchema = {
     [ids.notifyDetail]: {
       type: 'string',
       oneOf: [
-        {
-          const: 'email',
-          'x-orz': { i18n: { title: { 'zh-CN': '邮件' } } },
-        },
-        {
-          const: 'sms',
-          'x-orz': { i18n: { title: { 'zh-CN': '短信' } } },
-        },
-        {
-          const: 'none',
-          'x-orz': { i18n: { title: { 'zh-CN': '不接收' } } },
-        },
+        { const: 'email', 'x-form': { i18n: { title: { 'zh-CN': '邮件' } } } },
+        { const: 'sms', 'x-form': { i18n: { title: { 'zh-CN': '短信' } } } },
+        { const: 'none', 'x-form': { i18n: { title: { 'zh-CN': '不接收' } } } },
       ],
-      'x-orz': {
+      'x-form': {
         datasetFieldId: 'fld_notify',
         i18n: {
           title: { 'zh-CN': '通知偏好' },
-          description: { 'zh-CN': '仅当部门为「产品研发部」时显示（visibleIf）。' },
+          description: { 'zh-CN': '仅当部门为「产品研发部」时显示（availableIf）。' },
           placeholder: { 'zh-CN': '选择通知方式' },
         },
         ui: { widget: 'selector' },
-        visibleIf: {
+        availableIf: {
           fieldId: ids.dept,
           operator: 'equals',
           value: 'engineering',
@@ -156,7 +124,7 @@ const mockSchema: JsonSchema = {
       type: 'array',
       items: { type: 'string' },
       default: ['表单引擎'],
-      'x-orz': {
+      'x-form': {
         datasetFieldId: 'fld_tags',
         i18n: {
           title: { 'zh-CN': '自定义标签' },
@@ -167,35 +135,10 @@ const mockSchema: JsonSchema = {
     },
   },
   required: [ids.name, ids.email, ids.dept],
-  'x-orz': {
-    version: 1,
-    datasetId: 'ds_preview',
-    layout: [
-      {
-        id: 'intro',
-        type: 'markdown',
-        markdown: {
-          'zh-CN': '这是由 mock JSON Schema 驱动的 FormRenderer 预览。切换下方模式观察编辑态与填写态。',
-        },
-      },
-      {
-        id: 'basic',
-        type: 'section',
-        title: { 'zh-CN': '基本信息' },
-        children: [ids.name, ids.email, ids.dept],
-      },
-      {
-        id: 'profile',
-        type: 'section',
-        title: { 'zh-CN': '资料与偏好' },
-        children: [ids.skills, ids.bio, ids.notifyDetail, ids.tags],
-      },
-    ],
-    capture: {},
-  },
 };
 
-const mode = ref<FormRenderMode>('edit');
+const isEditMode = ref(true);
+const mode = computed<FormRenderMode>(() => (isEditMode.value ? 'edit' : 'fill'));
 const state = ref<Record<string, JsonValue | undefined>>({});
 const selectedFieldId = ref<string | null>(null);
 
@@ -273,9 +216,7 @@ function onFieldAction(action: string, fieldId: string): void {
           </div>
 
           <USwitch
-            v-model="mode"
-            :true-value="'edit'"
-            :false-value="'fill'"
+            v-model="isEditMode"
             label="编辑模式"
           />
         </div>

@@ -82,8 +82,8 @@ export class FormSubmissionsService {
       useDefaults: true,
     });
     addFormats(this.ajv);
-    // 注册 x-orz 关键字使 AJV 不会因未知关键字报错。
-    this.ajv.addKeyword({ keyword: 'x-orz', schemaType: 'object', valid: true });
+    // 注册 x-form 关键字使 AJV 不会因未知关键字报错。
+    this.ajv.addKeyword({ keyword: 'x-form', schemaType: 'object', valid: true });
   }
 
   /** 通过 Form slug 提交（公开入口，支持匿名）。 */
@@ -522,7 +522,7 @@ export class FormSubmissionsService {
 
   /**
    * 将 Form 提交的答案从 Form item ID 映射为 Dataset field ID。
-   * 根据 Schema 中每个 property 的 x-orz.datasetFieldId 进行转换；
+   * 根据 Schema 中每个 property 的 x-form.datasetFieldId 进行转换；
    * 关联字段放入 relations，普通字段放入 values。
    */
   private normalizeAnswers(
@@ -535,7 +535,7 @@ export class FormSubmissionsService {
     const values: Record<string, unknown> = {};
     const relations: Record<string, unknown> = {};
     Object.entries(answers).forEach(([itemId, value]) => {
-      const extension = properties[itemId]?.['x-orz'] as Record<string, unknown> | undefined;
+      const extension = properties[itemId]?.['x-form'] as Record<string, unknown> | undefined;
       if (!extension) throw new BadRequestException(`Unknown Form item: ${itemId}`);
       const fieldId = extension.datasetFieldId as string;
       const field = fieldsById.get(fieldId);
@@ -586,7 +586,7 @@ export class FormSubmissionsService {
     schema: Record<string, unknown>,
     userAgent: string | undefined,
   ): Prisma.InputJsonObject {
-    const root = schema['x-orz'] as Record<string, unknown>;
+    const root = schema['x-form'] as Record<string, unknown>;
     const capture = root.capture as Record<string, { datasetFieldId: string }>;
     const values: Record<string, Prisma.InputJsonValue> = {};
     if (capture.userAgent && userAgent) values[capture.userAgent.datasetFieldId] = userAgent;

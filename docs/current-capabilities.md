@@ -18,7 +18,7 @@
 - Dataset：`standard`、`members`、`join_requests` 和 `activity_registrations` 类型，字段定义、JSON Schema 值校验、行数据、关系字段、协作者和归档。
 - 历史与并发：Dataset 定义快照、Dataset 行版本、软删除/恢复和基于 `revision` 的乐观并发控制。
 - 特殊数据：成员资料同步、游客加入申请及批准/拒绝、活动及活动报名绑定。
-- Form：Draft 2020-12 JSON Schema、受控 `x-orz` 扩展、多语言文案、`visibleIf`、关联字段筛选、草稿/发布版本和匿名/登录提交策略。
+- Form：JSON Schema（AJV Draft 2020-12 方言，不要求 `$schema`）、受控 `x-form` 扩展、多语言文案、`availableIf`、关联字段筛选、草稿/发布版本和匿名/登录提交策略。详见 [form-schema.md](./form-schema.md)。
 - Form 提交：`create_row`、`update_subject_row`、AJV 校验、设备信息采集、幂等键、规范化 JSON checksum 和事务性写入。
 
 ## 当前前端能力

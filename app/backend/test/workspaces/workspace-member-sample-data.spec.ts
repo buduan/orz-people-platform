@@ -147,7 +147,7 @@ describe('Workspace member sample data', () => {
       type: 'object',
       additionalProperties: false,
       required: expect.any(Array),
-      'x-orz': expect.objectContaining({ datasetId: 'dataset-member-1' }),
+      'x-form': expect.objectContaining({ datasetId: 'dataset-member-1' }),
     });
     expect(fixture.tx.form.update).toHaveBeenCalledWith({
       where: { id: 'form-member-1' },

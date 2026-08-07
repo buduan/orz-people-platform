@@ -1,13 +1,13 @@
 import type {
   JsonValue,
-  VisibleIfExpression,
-  VisibleIfLeafOperator,
+  AvailableIfExpression,
+  AvailableIfLeafOperator,
 } from '@orz-people-platform/types';
 
 import { canonicalizeJson } from './json';
 
 /** 已注册的叶子操作符集合。 */
-const leafOperators = new Set<VisibleIfLeafOperator>([
+const leafOperators = new Set<AvailableIfLeafOperator>([
   'equals',
   'not_equals',
   'in',
@@ -36,23 +36,23 @@ function assertKeys(
   allowed: readonly string[],
 ): void {
   const unknown = Object.keys(input).find((key) => !allowed.includes(key));
-  if (unknown) throw new TypeError(`Unknown visibleIf property: ${unknown}`);
+  if (unknown) throw new TypeError(`Unknown availableIf property: ${unknown}`);
 }
 
 /**
- * 递归解析不可信的 visibleIf 输入。
+ * 递归解析不可信的 availableIf 输入。
  * 拒绝未知操作符、空条件组、错误值类型等非法输入。
  */
-function parseExpression(input: unknown): VisibleIfExpression {
+function parseExpression(input: unknown): AvailableIfExpression {
   if (!isRecord(input) || typeof input.operator !== 'string') {
-    throw new TypeError('visibleIf must be an object with an operator');
+    throw new TypeError('availableIf must be an object with an operator');
   }
 
   // 组合操作符：and / or。
   if (input.operator === 'and' || input.operator === 'or') {
     assertKeys(input, ['operator', 'conditions']);
     if (!Array.isArray(input.conditions) || input.conditions.length === 0) {
-      throw new TypeError(`visibleIf ${input.operator} requires non-empty conditions`);
+      throw new TypeError(`availableIf ${input.operator} requires non-empty conditions`);
     }
     return {
       operator: input.operator,
@@ -67,12 +67,12 @@ function parseExpression(input: unknown): VisibleIfExpression {
   }
 
   // 叶子操作符。
-  if (!leafOperators.has(input.operator as VisibleIfLeafOperator)) {
-    throw new TypeError(`Unknown visibleIf operator: ${input.operator}`);
+  if (!leafOperators.has(input.operator as AvailableIfLeafOperator)) {
+    throw new TypeError(`Unknown availableIf operator: ${input.operator}`);
   }
-  const operator = input.operator as VisibleIfLeafOperator;
+  const operator = input.operator as AvailableIfLeafOperator;
   if (typeof input.fieldId !== 'string' || input.fieldId.length === 0) {
-    throw new TypeError('visibleIf fieldId must be a non-empty string');
+    throw new TypeError('availableIf fieldId must be a non-empty string');
   }
 
   // is_empty / is_not_empty 仅需 fieldId。
@@ -85,7 +85,7 @@ function parseExpression(input: unknown): VisibleIfExpression {
   if (operator === 'in' || operator === 'not_in') {
     assertKeys(input, ['operator', 'fieldId', 'values']);
     if (!Array.isArray(input.values) || !input.values.every(isJsonValue)) {
-      throw new TypeError(`visibleIf ${operator} requires JSON values`);
+      throw new TypeError(`availableIf ${operator} requires JSON values`);
     }
     return { fieldId: input.fieldId, operator, values: input.values };
   }
@@ -93,7 +93,7 @@ function parseExpression(input: unknown): VisibleIfExpression {
   // 其余叶子操作符需要 value。
   assertKeys(input, ['operator', 'fieldId', 'value']);
   if (!isJsonValue(input.value)) {
-    throw new TypeError(`visibleIf ${operator} requires a JSON value`);
+    throw new TypeError(`availableIf ${operator} requires a JSON value`);
   }
   return { fieldId: input.fieldId, operator, value: input.value };
 }
@@ -109,13 +109,13 @@ function isEmpty(value: JsonValue | undefined): boolean {
     || (Array.isArray(value) && value.length === 0);
 }
 
-/** 解析并校验不可信的 visibleIf 表达式。 */
-export function parseVisibleIf(input: unknown): VisibleIfExpression {
+/** 解析并校验不可信的 availableIf 表达式。 */
+export function parseAvailableIf(input: unknown): AvailableIfExpression {
   return parseExpression(input);
 }
 
 /**
- * 根据 Form 当前值计算 visibleIf 表达式结果。
+ * 根据 Form 当前值计算 availableIf 表达式结果。
  *
  * 语义约定：
  * - 字段值缺失时除 is_empty 外的叶子判断均返回 false，
@@ -123,18 +123,18 @@ export function parseVisibleIf(input: unknown): VisibleIfExpression {
  * - contains 同时支持字符串包含和数组包含
  * - 比较使用规范 JSON 相等（Object.is 语义 + 对象 key 排序）
  */
-export function evaluateVisibleIf(
-  expression: VisibleIfExpression,
+export function evaluateAvailableIf(
+  expression: AvailableIfExpression,
   values: Readonly<Record<string, JsonValue | undefined>>,
 ): boolean {
   // 组合表达式。
   if ('conditions' in expression) {
     return expression.operator === 'and'
-      ? expression.conditions.every((condition) => evaluateVisibleIf(condition, values))
-      : expression.conditions.some((condition) => evaluateVisibleIf(condition, values));
+      ? expression.conditions.every((condition) => evaluateAvailableIf(condition, values))
+      : expression.conditions.some((condition) => evaluateAvailableIf(condition, values));
   }
   // 取反表达式。
-  if ('condition' in expression) return !evaluateVisibleIf(expression.condition, values);
+  if ('condition' in expression) return !evaluateAvailableIf(expression.condition, values);
 
   // 叶子表达式。
   const current = values[expression.fieldId];

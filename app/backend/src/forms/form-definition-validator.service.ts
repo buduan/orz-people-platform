@@ -50,13 +50,13 @@ export class FormDefinitionValidatorService {
     // 此处仅校验 Schema 结构，不额外要求每个 property 自身声明 required。
     this.ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
     addFormats(this.ajv);
-    // 注册 x-orz 关键字使 AJV 不会因未知关键字报错。
-    this.ajv.addKeyword({ keyword: 'x-orz', schemaType: 'object', valid: true });
+    // 注册 x-form 关键字使 AJV 不会因未知关键字报错。
+    this.ajv.addKeyword({ keyword: 'x-form', schemaType: 'object', valid: true });
   }
 
   /**
    * 执行完整校验：
-   * 1. Schema 结构合法性（Draft 2020-12 + x-orz 扩展）
+   * 1. Schema 结构合法性（AJV Draft 2020-12 方言 + x-form 扩展；不要求声明 $schema）
    * 2. Dataset 绑定一致性
    * 3. 字段映射正确性（一对一映射、不可映射系统字段）
    * 4. 关联字段安全策略（目标不可为 members/join_requests）
@@ -65,22 +65,19 @@ export class FormDefinitionValidatorService {
    * 7. 必填字段覆盖检查（create_row 模式）
    */
   public validate(schema: Record<string, unknown>, context: DefinitionContext): void {
-    if (schema.$schema !== 'https://json-schema.org/draft/2020-12/schema') {
-      throw new BadRequestException('Form Schema must declare Draft 2020-12');
-    }
     if (schema.type !== 'object' || schema.additionalProperties !== false) {
       throw new BadRequestException('Form Schema must be an object and reject additional properties');
     }
     try {
       this.ajv.compile(schema);
-      // 平台扩展校验（x-orz 命名空间、Form item ID 格式、i18n、布局等）。
+      // 平台扩展校验（x-form 命名空间、Form item ID 格式、i18n 等）。
       validateFormSchemaExtensions(schema as JsonSchema);
     } catch (error) {
       throw new BadRequestException(
         `Invalid Form Schema: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    const rootExtension = schema['x-orz'] as Record<string, unknown>;
+    const rootExtension = schema['x-form'] as Record<string, unknown>;
     if (rootExtension.datasetId !== context.dataset.id) {
       throw new BadRequestException('Form Schema Dataset binding does not match the Form');
     }
@@ -92,7 +89,7 @@ export class FormDefinitionValidatorService {
     // 提取所有 Form item → DatasetField 映射。
     const mappings = Object.entries(properties).map(([itemId, property]) => ({
       itemId,
-      extension: property['x-orz'] as Record<string, unknown>,
+      extension: property['x-form'] as Record<string, unknown>,
     }));
 
     // 同一 Schema 中一个 DatasetField 最多被一个 Form item 映射。

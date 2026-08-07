@@ -1,8 +1,8 @@
 <script setup lang="ts">
-/* eslint-disable vue/valid-v-for -- layout node keys use schema ids */
+/* eslint-disable vue/valid-v-for -- FormField keys use schema item ids */
 import { computed, provide, watch } from '#imports';
 import type { FormItemId, JsonSchema, JsonValue } from '@orz-people-platform/types';
-import { createInitialFormState, getRootExtension } from '@orz-people-platform/utils';
+import { createInitialFormState, getSchemaProperties } from '@orz-people-platform/utils';
 import { useFormFieldEditingState } from '~/composables/useFormFieldEditing';
 import type { FormRenderContext, FormRenderMode } from './types';
 
@@ -35,8 +35,7 @@ const emit = defineEmits<{
 
 const { selectedFieldId: activeEditingId, clearEditing } = useFormFieldEditingState();
 
-const rootExtension = computed(() => getRootExtension(props.schema));
-const layout = computed(() => rootExtension.value?.layout ?? []);
+const properties = computed(() => getSchemaProperties(props.schema));
 
 const formContext = computed<FormRenderContext>(() => ({
   locale: props.locale,
@@ -91,10 +90,9 @@ function onSubmit(): void {
     @click.self="onBlankClick"
   >
     <FormField
-      v-for="node in layout"
-      :key="node.id"
-      :field-id="node.id"
-      :layout-node="node"
+      v-for="(_, itemId) in properties ?? {}"
+      :key="itemId"
+      :field-id="itemId"
       :allow-edit="allowEdit"
       @up="emit('up', $event)"
       @down="emit('down', $event)"

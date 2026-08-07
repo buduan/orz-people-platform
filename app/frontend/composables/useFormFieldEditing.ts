@@ -11,7 +11,7 @@ const activeEditingId = ref<string | null>(null);
 /**
  * FormField 编辑态互斥上下文。
  *
- * 传入稳定 fieldId（schema itemId / layout node id）。同一时刻至多一个
+ * 传入稳定 fieldId（schema itemId）。同一时刻至多一个
  * 字段处于编辑态；将 editing 置 true 会抢占互斥。
  */
 export function useFormFieldEditing(fieldId: string): {
