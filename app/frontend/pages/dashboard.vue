@@ -7,7 +7,7 @@ definePageMeta({
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
     <header
       class="grid gap-6 border-b border-accented pb-7
         md:grid-cols-[minmax(0,1fr)_auto] md:items-end"

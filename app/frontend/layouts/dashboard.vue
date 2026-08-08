@@ -130,7 +130,7 @@ async function logout(): Promise<void> {
 
       <main
         id="dashboard-content"
-        class="dashboard-canvas min-h-[100dvh] px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+        class="dashboard-canvas min-h-[100dvh]"
       >
         <div class="mx-auto w-full max-w-[92rem]">
           <slot />
