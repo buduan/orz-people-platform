@@ -52,6 +52,7 @@ jobs:
         with:
           name: frontend-${{ github.ref_name }}
           path: app/frontend/.output
+          include-hidden-files: true
           if-no-files-found: error
 
       - name: Upload backend artifact
