@@ -54,7 +54,7 @@ export class AuthSettingsService {
     this.audience = config.get('JWT_AUDIENCE') || 'orz-people-platform-api';
     this.webauthnRpId = config.get('WEBAUTHN_RP_ID') || 'localhost';
     this.webauthnRpName = config.get('WEBAUTHN_RP_NAME') || 'Orz People Platform';
-    this.webauthnOrigins = (config.get<string>('WEBAUTHN_ORIGINS') || 'http://localhost:3001')
+    this.webauthnOrigins = (config.get<string>('WEBAUTHN_ORIGINS') || 'http://localhost:6771')
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean);

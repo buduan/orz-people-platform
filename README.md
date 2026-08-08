@@ -117,12 +117,12 @@ pnpm dev:frontend
 
 | 服务 | 地址 |
 | --- | --- |
-| Frontend | <http://localhost:3001> |
-| Backend | <http://localhost:3000> |
-| Health check | <http://localhost:3000/health> |
-| Swagger UI | <http://localhost:3000/docs> |
-| OpenAPI JSON | <http://localhost:3000/docs-json> |
-| OpenAPI YAML | <http://localhost:3000/docs-yaml> |
+| Frontend | <http://localhost:6771> |
+| Backend | <http://localhost:6770> |
+| Health check | <http://localhost:6770/health> |
+| Swagger UI | <http://localhost:6770/docs> |
+| OpenAPI JSON | <http://localhost:6770/docs-json> |
+| OpenAPI YAML | <http://localhost:6770/docs-yaml> |
 
 后端开发模式会在配置端口被占用时尝试下一个可用端口，并在启动日志中打印实际地址。
 
@@ -157,7 +157,7 @@ pnpm bootstrap:admin --non-interactive
 pnpm start
 ```
 
-后端容器启动时会先执行 `prisma migrate deploy`，然后启动 NestJS；前端容器运行 Nuxt 生产构建。外部端口由 `FRONTEND_PORT` 和 `BACKEND_PORT` 控制，默认分别为 `3001` 和 `3000`。
+后端容器启动时会先执行 `prisma migrate deploy`，然后启动 NestJS；前端容器运行 Nuxt 生产构建。外部端口由 `FRONTEND_PORT` 和 `BACKEND_PORT` 控制，默认分别为 `6771` 和 `6770`。
 
 生产环境必须在启动前设置随机的 `JWT_SECRET`、`AUTH_HMAC_SECRET` 和 `TOTP_ENCRYPTION_KEY`，显式设置认证 TTL，并为 `WEBAUTHN_ORIGINS` 使用 HTTPS。后端在 `NODE_ENV=production` 下会拒绝开发回退密钥、隐式 TTL 和非 HTTPS WebAuthn origin。
 

@@ -27,6 +27,6 @@ WORKDIR /app
 COPY --from=builder /production ./
 COPY --from=builder /workspace/app/backend/prisma ./prisma
 
-EXPOSE 3000
+EXPOSE 6770
 
 CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma && node dist/main.js"]

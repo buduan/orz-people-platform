@@ -8,10 +8,10 @@ services:
     restart: unless-stopped
     environment:
       NITRO_HOST: 0.0.0.0
-      NITRO_PORT: 3000
-      NUXT_PUBLIC_API_ORIGIN: ${API_ORIGIN:-http://localhost:3000}
+      NITRO_PORT: ${NUXT_PORT:-6771}
+      NUXT_PUBLIC_API_ORIGIN: ${API_ORIGIN:-http://localhost:6770}
     ports:
-      - '${FRONTEND_PORT:-3001}:3000'
+      - '${FRONTEND_PORT:-6771}:${NUXT_PORT:-6771}'
     depends_on:
       backend:
         condition: service_started
@@ -23,13 +23,31 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      PORT: 3000
+      PORT: ${PORT:-6770}
       APP_ORIGIN: ${APP_ORIGIN}
-      API_ORIGIN: ${API_ORIGIN:-http://localhost:3000}
+      API_ORIGIN: ${API_ORIGIN:-http://localhost:6770}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-orz-people-platform}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-orz-people-platform-api}
+      JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS}
+      AUTH_HMAC_SECRET: ${AUTH_HMAC_SECRET}
+      AUTH_REFRESH_TTL_SECONDS: ${AUTH_REFRESH_TTL_SECONDS}
+      AUTH_OTP_TTL_SECONDS: ${AUTH_OTP_TTL_SECONDS}
+      AUTH_CHALLENGE_TTL_SECONDS: ${AUTH_CHALLENGE_TTL_SECONDS}
+      AUTH_LOGIN_MAX_ATTEMPTS: ${AUTH_LOGIN_MAX_ATTEMPTS:-10}
+      AUTH_LOGIN_WINDOW_SECONDS: ${AUTH_LOGIN_WINDOW_SECONDS:-900}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}
+      TOTP_PERIOD_SECONDS: ${TOTP_PERIOD_SECONDS}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Orz People Platform}
+      WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:-http://localhost:6771}
+      FORM_SUBMISSION_RATE_LIMIT: ${FORM_SUBMISSION_RATE_LIMIT:-30}
+      FORM_SUBMISSION_RATE_WINDOW_SECONDS: ${FORM_SUBMISSION_RATE_WINDOW_SECONDS:-60}
+      DEFAULT_WORKSPACE_ID: ${DEFAULT_WORKSPACE_ID:-1}
     ports:
-      - '${BACKEND_PORT:-3000}:3000'
+      - '${BACKEND_PORT:-6770}:${PORT:-6770}'
     depends_on:
       postgres:
         condition: service_healthy

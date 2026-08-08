@@ -25,10 +25,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NUXT_HOST=0.0.0.0
-ENV NUXT_PORT=3000
+ENV NITRO_PORT=6771
 
 COPY --from=build /workspace/app/frontend/.output ./.output
 
-EXPOSE 3000
+EXPOSE 6771
 
 CMD ["node", ".output/server/index.mjs"]

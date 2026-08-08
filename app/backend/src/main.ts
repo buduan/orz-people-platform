@@ -21,7 +21,7 @@ function getNetworkAddress(): string | undefined {
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
-  const configuredPort = Number(config.get('PORT') ?? 3000);
+  const configuredPort = Number(config.get('PORT') ?? 6770);
   const appOrigin = config.get<string>('APP_ORIGIN');
   const isDevelopment = (config.get<string>('NODE_ENV') || 'development') === 'development';
   const corsOrigin: CustomOrigin = (origin, callback) => {

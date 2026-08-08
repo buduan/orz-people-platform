@@ -7,6 +7,7 @@ loadEnvironment({
 });
 
 export default defineNuxtConfig({
+  devServer: { port: 6771 },
   alias: {
     '@': fileURLToPath(new URL('./', import.meta.url)),
     '@orz-people-platform/types': fileURLToPath(
@@ -28,7 +29,7 @@ export default defineNuxtConfig({
   modules: ['@nuxt/ui', '@pinia/nuxt'],
   runtimeConfig: {
     public: {
-      apiOrigin: process.env.API_ORIGIN || 'http://localhost:3000',
+      apiOrigin: process.env.API_ORIGIN || 'http://localhost:6770',
     },
   },
   fonts: {

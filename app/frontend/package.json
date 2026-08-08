@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev --host 0.0.0.0",
+    "dev": "nuxt dev --dotenv ../../.env --host 0.0.0.0",
     "preview": "nuxt preview --host 0.0.0.0",
     "typecheck": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && nuxt typecheck"
   },
