@@ -16,7 +16,7 @@ interface BaseFormMetadata {
   submissionAccess: FormSubmissionAccess;
   /** 新增行还是更新当前用户关联行。 */
   writeMode: FormWriteMode;
-  /** 完整的 Form JSON Schema（Draft 2020-12 + x-orz 扩展）。 */
+  /** 完整的 Form JSON Schema（AJV Draft 2020-12 方言校验 + x-form 扩展；不要求 $schema）。 */
   schema: Record<string, unknown>;
 }
 

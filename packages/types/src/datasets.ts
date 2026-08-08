@@ -108,6 +108,26 @@ export interface DatasetFieldDefinition {
   archivedAt: string | null;
 }
 
+/** Form 面板所需的 Dataset 详情。 */
+export interface DatasetPanelDetail extends DatasetSummary {
+  fields: DatasetFieldDefinition[];
+}
+
+/** Form 编辑器内创建 Dataset 字段的请求。 */
+export interface CreateDatasetFieldRequest {
+  datasetId: string;
+  key: string;
+  name: string;
+  description?: string;
+  kind: DatasetFieldKind;
+  valueSchema: JsonSchema;
+  config: JsonObject;
+  required: boolean;
+  relationTargetDatasetId?: string;
+  relationCardinality?: RelationCardinality;
+  position?: number;
+}
+
 /** Dataset 行数据（含合并后的关联关系）。 */
 export interface DatasetRowData {
   id: string;

@@ -17,6 +17,7 @@
     "@tanstack/vue-virtual": "^3.13.32",
     "@vueuse/core": "^13.9.0",
     "dotenv": "^16.6.1",
+    "monaco-editor": "^0.56.0",
     "nuxt": "catalog:",
     "pinia": "catalog:",
     "tailwindcss": "^4.3.3"

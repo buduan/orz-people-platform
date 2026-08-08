@@ -26,7 +26,12 @@ import {
 | `validatePassword` | `password-policy.ts` | 检查密码是否满足平台密码策略 |
 | `parseVisibleIf` | `visible-if.ts` | 解析并严格校验 `visibleIf` 条件表达式 |
 | `evaluateVisibleIf` | `visible-if.ts` | 使用表单值计算条件表达式结果 |
-| `validateFormSchemaExtensions` | `form-schema.ts` | 校验表单 Schema 中的 `x-orz` 扩展 |
+| `validateFormSchemaExtensions` | `form-schema.ts` | 校验表单 Schema 中的 `x-form` 扩展 |
+| `resolveLocalizedText` | `form-schema.ts` | 按 locale 解析多语言文案 |
+| `getRootExtension` / `getItemExtension` | `form-schema.ts` | 软读取根 / item 的 `x-form` |
+| `getSchemaProperties` / `getRequiredItemIds` | `form-schema.ts` | 软读取 properties 与 required |
+| `getChoiceOptions` | `form-schema.ts` | 从 `oneOf` 投影选项列表 |
+| `isItemVisible` / `createInitialFormState` | `form-schema.ts` | 条件显示与默认值 state |
 | `PasswordPolicyResult` | `password-policy.ts` | 描述密码策略校验结果 |
 | `JsonValue`、`JsonSchema`、`JsonSchemaObject` | `parse-json-schema.ts` | 重新导出的共享 JSON 类型 |
 
@@ -48,19 +53,19 @@ parseJsonSchema('[]');                   // 抛出 SyntaxError
 
 ### `validateFormSchemaExtensions`
 
-`validateFormSchemaExtensions(schema)` 在标准 JSON Schema 校验成功后，检查平台定义的 `x-orz` 扩展。函数通过 TypeScript assertion 将参数收窄为 `JsonSchemaObject`，并在发现非法结构时抛出 `TypeError`。
+`validateFormSchemaExtensions(schema)` 在标准 JSON Schema 校验成功后，检查平台定义的 `x-form` 扩展。函数通过 TypeScript assertion 将参数收窄为 `JsonSchemaObject`，并在发现非法结构时抛出 `TypeError`。
 
 该函数检查以下内容：
 
 - 根节点存在 `properties` 对象，并且每个表单项 ID 都符合 `q_` 加 UUID v4 的格式。
-- 每个表单项都存在 `x-orz`，且必须包含非空的 `datasetFieldId`。
+- 每个表单项都存在 `x-form`，且必须包含非空的 `datasetFieldId`。
 - `i18n` 只接受 `description`、`placeholder`、`title`；其中已声明的本地化字段必须是非空语言映射，映射值必须为字符串。
 - `ui` 必须包含非空 `widget`；`options` 只接受 `filter` 和 `labelFieldId`。
 - 关系过滤器必须且只能使用 `all` 或 `any` 之一，并包含至少一个条件。条件支持 `equals`、`not_equals`、`in`、`contains`、`is_empty`、`is_not_empty`，且不能同时提供 `value` 和 `valueFrom`。
 - `visibleIf` 必须是合法的条件表达式，并且引用的表单项 ID 必须存在于当前 Schema。
-- `oneOf` 选项可以声明 `x-orz.i18n`，选项扩展只接受 `i18n`。
-- 根节点 `x-orz` 必须包含 `version: 1`、非空 `datasetId`、数组类型的 `layout` 和对象类型的 `capture`。
-- `layout` 节点只能使用 `markdown` 或 `section` 类型；其 `children` 只能引用当前 Schema 中存在的表单项。
+- `oneOf` 选项可以声明 `x-form.i18n`，选项扩展只接受 `i18n`。
+- 根节点 `x-form` 必须包含 `version: 1`、非空 `datasetId` 和对象类型的 `capture`。
+- `properties` 的对象键序即字段展示顺序；平台不使用单独的 layout 扩展。
 - `capture` 只能包含 `browser`、`operatingSystem`、`userAgent`，每个配置都必须提供非空的 `datasetFieldId`。
 
 函数只校验扩展自身的结构和表单项之间的引用关系。数据集是否存在、字段是否属于目标数据集、字段是否允许写入等业务关联校验由后端的表单定义校验服务继续处理。
@@ -70,6 +75,18 @@ const schema = parseJsonSchema(source);
 
 // 先执行 AJV 等标准 JSON Schema 校验，再校验平台扩展。
 validateFormSchemaExtensions(schema);
+```
+
+### 读路径 helpers
+
+以下函数用于渲染或映射，**不抛异常**：结构不符时返回 `null` / 空集合。
+
+```ts [packages/utils/src/form-schema.ts]
+resolveLocalizedText({ 'zh-CN': '姓名', en: 'Name' }, 'en'); // 'Name'
+getRootExtension(schema)?.datasetId;
+getItemExtension(schema.properties[itemId]);
+getChoiceOptions(property, 'zh-CN');
+createInitialFormState(schema);
 ```
 
 ## 身份标识

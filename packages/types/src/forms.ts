@@ -1,4 +1,4 @@
-import type { JsonSchema, JsonValue } from './json';
+import type { JsonSchema, JsonSchemaObject, JsonValue } from './json';
 
 /** 多语言文案映射，key 为 BCP 47 locale。 */
 export type LocalizedText = Record<string, string>;
@@ -28,10 +28,10 @@ export type FormWriteMode = (typeof formWriteModes)[number];
 export const formSubmissionOperations = ['created', 'updated'] as const;
 export type FormSubmissionOperation = (typeof formSubmissionOperations)[number];
 
-// ---- visibleIf 条件表达式 ----
+// ---- availableIf 条件表达式 ----
 
-/** visibleIf 叶子操作符集合。 */
-export const visibleIfLeafOperators = [
+/** availableIf 叶子操作符集合。 */
+export const availableIfLeafOperators = [
   'equals',
   'not_equals',
   'in',
@@ -40,47 +40,47 @@ export const visibleIfLeafOperators = [
   'is_empty',
   'is_not_empty',
 ] as const;
-export type VisibleIfLeafOperator = (typeof visibleIfLeafOperators)[number];
+export type AvailableIfLeafOperator = (typeof availableIfLeafOperators)[number];
 
 /** 比较型条件：fieldId 的值与固定 value 比较。 */
-export interface VisibleIfComparisonExpression {
+export interface AvailableIfComparisonExpression {
   fieldId: FormItemId;
   operator: 'contains' | 'equals' | 'not_equals';
   value: JsonValue;
 }
 
 /** 集合型条件：fieldId 的值是否在/不在 values 列表中。 */
-export interface VisibleIfMembershipExpression {
+export interface AvailableIfMembershipExpression {
   fieldId: FormItemId;
   operator: 'in' | 'not_in';
   values: JsonValue[];
 }
 
 /** 空值判断条件：fieldId 的值是否为空。 */
-export interface VisibleIfEmptyExpression {
+export interface AvailableIfEmptyExpression {
   fieldId: FormItemId;
   operator: 'is_empty' | 'is_not_empty';
 }
 
 /** 组合条件组：and（全满足）或 or（任一满足）。 */
-export interface VisibleIfGroupExpression {
+export interface AvailableIfGroupExpression {
   operator: 'and' | 'or';
-  conditions: VisibleIfExpression[];
+  conditions: AvailableIfExpression[];
 }
 
 /** 逻辑取反：对嵌套表达式结果取反。 */
-export interface VisibleIfNotExpression {
+export interface AvailableIfNotExpression {
   operator: 'not';
-  condition: VisibleIfExpression;
+  condition: AvailableIfExpression;
 }
 
-/** visibleIf 表达式的联合类型。 */
-export type VisibleIfExpression =
-  | VisibleIfComparisonExpression
-  | VisibleIfEmptyExpression
-  | VisibleIfGroupExpression
-  | VisibleIfMembershipExpression
-  | VisibleIfNotExpression;
+/** availableIf 表达式的联合类型。 */
+export type AvailableIfExpression =
+  | AvailableIfComparisonExpression
+  | AvailableIfEmptyExpression
+  | AvailableIfGroupExpression
+  | AvailableIfMembershipExpression
+  | AvailableIfNotExpression;
 
 // ---- 关联筛选 ----
 
@@ -109,7 +109,7 @@ export interface RelationFilterExpression {
   any?: RelationFilterCondition[];
 }
 
-// ---- Form Schema x-orz 扩展 ----
+// ---- Form Schema x-form 扩展 ----
 
 /** Form item 的多语言扩展。 */
 export interface FormItemI18n {
@@ -131,21 +131,12 @@ export interface FormItemUi {
   widget: string;
 }
 
-/** Form item 的 x-orz 扩展（字段映射、i18n、UI、条件显示）。 */
+/** Form item 的 x-form 扩展（字段映射、i18n、UI、条件显示）。 */
 export interface FormItemExtension {
   datasetFieldId: string;
   i18n?: FormItemI18n;
   ui?: FormItemUi;
-  visibleIf?: VisibleIfExpression;
-}
-
-/** Form 布局节点：section（分组容器）或 markdown（说明文本）。 */
-export interface FormLayoutNode {
-  children?: FormItemId[];
-  id: string;
-  markdown?: LocalizedText;
-  title?: LocalizedText;
-  type: 'markdown' | 'section';
+  availableIf?: AvailableIfExpression;
 }
 
 /** 单个设备采集字段配置。 */
@@ -160,11 +151,11 @@ export interface FormCaptureSettings {
   userAgent?: FormCaptureField;
 }
 
-/** Form 根节点的 x-orz 扩展。 */
+/** Form 根节点的 x-form 扩展。 */
 export interface FormRootExtension {
   capture: FormCaptureSettings;
   datasetId: string;
-  layout: FormLayoutNode[];
+  i18n?: FormItemI18n;
   version: 1;
 }
 
@@ -197,7 +188,7 @@ export interface FormVersionDefinition {
   closesAt: string | null;
   submissionAccess: FormSubmissionAccess;
   writeMode: FormWriteMode;
-  /** 完整的 Form JSON Schema（Draft 2020-12 + x-orz 扩展）。 */
+  /** 完整的 Form JSON Schema（AJV Draft 2020-12 方言校验 + x-form 扩展；不要求 $schema）。 */
   schema: JsonSchema;
   /** Schema 内容的 SHA-256 规范校验和，用于幂等比较。 */
   schemaChecksum: string;
@@ -216,4 +207,103 @@ export interface FormSubmissionSummary {
   submitterUserId: string | null;
   operation: FormSubmissionOperation;
   submittedAt: string;
+}
+
+// ---- Panel Form 管理 API ----
+
+/** 表单列表分区。main = active + closed。 */
+export const formListSections = ['main', 'archived', 'all'] as const;
+export type FormListSection = (typeof formListSections)[number];
+
+/** 面板中展示的 Form 创建人。 */
+export interface FormCreatorSummary {
+  id: string;
+  displayName: string;
+}
+
+/** Redis 编辑锁的安全摘要；不向非持有者暴露 token。 */
+export interface FormEditLockSummary {
+  locked: boolean;
+  holderUserId: string | null;
+  holderName: string | null;
+  lockedAt: string | null;
+}
+
+/** Form 面板列表项。 */
+export interface FormPanelSummary extends FormSummary {
+  title: string;
+  creator: FormCreatorSummary;
+  hasDraft: boolean;
+  hasRelease: boolean;
+  lock: FormEditLockSummary;
+}
+
+/** Form 面板详情，draft/release 均由现有版本状态推导。 */
+export interface FormPanelDetail extends FormSummary {
+  creator: FormCreatorSummary;
+  draft: FormVersionDefinition | null;
+  release: FormVersionDefinition | null;
+  lock: FormEditLockSummary;
+}
+
+/** 创建或保存 draft 时提交的完整版本定义。 */
+export interface FormDraftDefinitionInput {
+  defaultLocale: string;
+  nameI18n: LocalizedText;
+  descriptionI18n?: LocalizedText;
+  closingMessageI18n?: LocalizedText;
+  opensAt?: string;
+  closesAt?: string;
+  submissionAccess: FormSubmissionAccess;
+  writeMode: FormWriteMode;
+  schema: JsonSchemaObject;
+}
+
+export interface CreateFormRequest extends FormDraftDefinitionInput {
+  datasetId: string;
+  slug: string;
+}
+
+export interface CreateFormResult {
+  form: FormSummary;
+  draft: FormVersionDefinition;
+}
+
+export interface SaveFormDraftRequest extends FormDraftDefinitionInput {
+  formId: string;
+  expectedRevision: number;
+  lockToken: string;
+}
+
+export interface PublishFormRequest {
+  formId: string;
+  expectedRevision: number;
+  lockToken: string;
+}
+
+export interface ChangeFormStatusRequest {
+  formId: string;
+  expectedRevision: number;
+}
+
+export interface FormEditLockRequest {
+  formId: string;
+}
+
+export interface FormEditLockTokenRequest extends FormEditLockRequest {
+  token: string;
+}
+
+export interface AcquireFormEditLockResult {
+  expiresIn: number;
+  lock: FormEditLockSummary;
+  token: string;
+}
+
+export interface HeartbeatFormEditLockResult {
+  expiresIn: number;
+}
+
+export interface ReleaseFormEditLockResult {
+  released: true;
 }

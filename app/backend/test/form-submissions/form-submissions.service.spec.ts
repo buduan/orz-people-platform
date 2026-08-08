@@ -27,25 +27,24 @@ const itemB = 'q_22222222-2222-4222-8222-222222222222';
 
 function schema() {
   return {
-    $schema: 'https://json-schema.org/draft/2020-12/schema',
     type: 'object',
     additionalProperties: false,
     properties: {
       [itemA]: {
         type: 'string',
         enum: ['yes', 'no'],
-        'x-orz': { datasetFieldId: 'field-a' },
+        'x-form': { datasetFieldId: 'field-a' },
       },
       [itemB]: {
         type: 'string',
-        'x-orz': { datasetFieldId: 'field-b' },
+        'x-form': { datasetFieldId: 'field-b' },
       },
     },
     required: [itemA],
     if: { properties: { [itemA]: { const: 'yes' } }, required: [itemA] },
     then: { required: [itemB] },
-    'x-orz': {
-      version: 1, datasetId: 'dataset-1', layout: [], capture: {},
+    'x-form': {
+      version: 1, datasetId: 'dataset-1', capture: {},
     },
   };
 }

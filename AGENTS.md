@@ -18,6 +18,10 @@ Use Node 22+ and pnpm 10.
 
 Write strict TypeScript with two-space indentation, semicolons, single quotes, and trailing commas. Follow `eslint.config.mjs`. Use PascalCase for classes and Vue components, camelCase for variables and functions, and kebab-case for filenames. NestJS files use role suffixes such as `redis.service.ts`. Prefer Vue 3 `<script setup lang="ts">`.
 
+## Panel Navigation
+
+When a panel page needs a dashboard breadcrumb, set its page name with `title` in `definePageMeta`, for example `definePageMeta({ layout: 'dashboard', title: '表单编辑' })`. Use `PanelCommonNavigation` in the page header when its route context is useful; it renders the dashboard path from `meta.title`. Do not add a page-specific breadcrumb implementation.
+
 ## Shared Types & Utilities
 
 Place types used by both applications in `packages/types/src/` and import them through `@orz-people-platform/types`. Examples include API request and response bodies, pagination and error envelopes, shared enums, identifiers, and framework-neutral domain contracts. Do not duplicate these definitions in an application.

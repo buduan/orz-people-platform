@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   BadRequestException,
   ConflictException,
@@ -8,22 +10,36 @@ import {
   DatasetFieldKind,
   DatasetStatus,
   type Dataset,
+  type Form,
+  type FormVersion,
   FormStatus,
   FormVersionState,
   Prisma,
 } from '@prisma/client';
 
 import type {
+  AcquireFormEditLockResult,
   AuthenticatedActor,
+  CreateFormResult,
+  FormCreatorSummary,
+  FormEditLockSummary,
+  FormListSection,
+  FormPanelDetail,
+  FormPanelSummary,
+  FormSummary,
+  FormVersionDefinition,
+  HeartbeatFormEditLockResult,
   JsonValue,
+  ReleaseFormEditLockResult,
   RelationFilterCondition,
   RelationFilterExpression,
 } from '@orz-people-platform/types';
-import { checksumJson } from '@orz-people-platform/utils';
+import { checksumJson, resolveLocalizedText } from '@orz-people-platform/utils';
 
 import { AuditService } from '../audit/audit.service';
 import { DatasetsService } from '../datasets/datasets.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { FormDefinitionValidatorService } from './form-definition-validator.service';
 import type {
   CreateFormInput,
@@ -42,6 +58,34 @@ interface VersionDefinitionInput {
   submissionAccess: CreateFormInput['submissionAccess'];
   writeMode: CreateFormInput['writeMode'];
 }
+
+interface FormEditLockRecord {
+  holderName: string;
+  lockedAt: string;
+  token: string;
+  userId: string;
+}
+
+const editLockTtlSeconds = 90;
+
+const panelFormInclude = Prisma.validator<Prisma.FormInclude>()({
+  activeVersion: true,
+  createdBy: {
+    select: {
+      id: true,
+      name: true,
+      nickname: true,
+      username: true,
+    },
+  },
+  versions: {
+    where: { state: FormVersionState.draft },
+    orderBy: { version: 'desc' },
+    take: 1,
+  },
+});
+
+type PanelFormRecord = Prisma.FormGetPayload<{ include: typeof panelFormInclude }>;
 
 /** 设备信息采集的固定定义：采集键 → 系统字段 key 和名称。 */
 const captureDefinitions = {
@@ -62,6 +106,7 @@ export class FormsService {
     private readonly datasets: DatasetsService,
     private readonly validator: FormDefinitionValidatorService,
     private readonly audit: AuditService,
+    private readonly redis: RedisService,
   ) {}
 
   /**
@@ -69,33 +114,60 @@ export class FormsService {
    * 持有 form.manage_all 权限的用户看到全部；
    * 其他用户只看到其可读 Dataset 下的 Form。
    */
-  public async list(workspaceId: number, actor: AuthenticatedActor) {
+  public async list(
+    workspaceId: number,
+    actor: AuthenticatedActor,
+    section: FormListSection = 'main',
+  ): Promise<FormPanelSummary[]> {
     if (actor.workspaceId !== workspaceId) throw new NotFoundException('Workspace not found');
-    if (actor.permissions.includes('form.manage_all')) {
-      return this.prisma.form.findMany({
-        where: { workspaceId },
-        include: { activeVersion: true },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
-    const datasets = await this.datasets.list(workspaceId, actor);
-    return this.prisma.form.findMany({
-      where: { workspaceId, datasetId: { in: datasets.map((dataset) => dataset.id) } },
-      include: { activeVersion: true },
-      orderBy: { createdAt: 'desc' },
+    const datasetIds = actor.permissions.includes('form.manage_all')
+      ? undefined
+      : (await this.datasets.list(workspaceId, actor)).map((dataset) => dataset.id);
+    let status: Prisma.EnumFormStatusFilter | FormStatus | undefined;
+    if (section === 'main') status = { in: [FormStatus.active, FormStatus.closed] };
+    if (section === 'archived') status = FormStatus.archived;
+    const forms = await this.prisma.form.findMany({
+      where: {
+        workspaceId,
+        ...(datasetIds && { datasetId: { in: datasetIds } }),
+        ...(status && { status }),
+      },
+      include: panelFormInclude,
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     });
+    const locks = forms.length === 0
+      ? []
+      : await this.redis.mget(forms.map((form) => this.editLockKey(workspaceId, form.id)));
+    return forms.map((form, index) => this.toPanelSummary(
+      form,
+      this.toLockSummary(this.parseLock(locks[index] ?? null)),
+    ));
   }
 
-  /** 获取单个 Form，含活跃版本和全部历史版本列表。 */
-  public async get(workspaceId: number, formId: string, actor: AuthenticatedActor) {
+  /** 获取单个 Form，含最新草稿和当前活跃发布版本。 */
+  public async get(
+    workspaceId: number,
+    formId: string,
+    actor: AuthenticatedActor,
+  ): Promise<FormPanelDetail> {
     const form = await this.findForm(workspaceId, formId);
     if (!actor.permissions.includes('form.manage_all')) {
       await this.datasets.assertCanRead(workspaceId, form.datasetId, actor);
     }
-    return this.prisma.form.findUniqueOrThrow({
+    const detail = await this.prisma.form.findUniqueOrThrow({
       where: { id: formId },
-      include: { activeVersion: true, versions: { orderBy: { version: 'desc' } } },
+      include: panelFormInclude,
     });
+    const lock = this.parseLock(await this.redis.get(this.editLockKey(workspaceId, formId)));
+    return {
+      ...this.toFormSummary(detail),
+      creator: this.toCreatorSummary(detail.createdBy),
+      draft: detail.versions[0] ? this.toVersionDefinition(detail.versions[0]) : null,
+      release: detail.activeVersion
+        ? this.toVersionDefinition(detail.activeVersion)
+        : null,
+      lock: this.toLockSummary(lock),
+    };
   }
 
   /**
@@ -106,12 +178,12 @@ export class FormsService {
     workspaceId: number,
     dto: CreateFormInput,
     actor: AuthenticatedActor,
-  ) {
+  ): Promise<CreateFormResult> {
     const dataset = await this.findManagedDataset(workspaceId, dto.datasetId, actor);
     if (dataset.status !== DatasetStatus.active) throw new ConflictException('Dataset is archived');
     this.validateMetadata(dto);
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const created = await this.prisma.$transaction(async (tx) => {
         const { schema, checksum } = await this.prepareFormSchema(tx, dataset, dto, actor.userId);
         const form = await tx.form.create({
           data: {
@@ -138,10 +210,14 @@ export class FormsService {
           resourceId: form.id,
           result: 'success',
           workspaceId,
-          metadata: { datasetId: dataset.id, draftVersionId: version.id },
+          metadata: { datasetId: dataset.id, versionId: version.id },
         }, tx);
-        return { ...form, versions: [version] };
+        return { form, version };
       });
+      return {
+        form: this.toFormSummary(created.form),
+        draft: this.toVersionDefinition(created.version),
+      };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('Form slug is already in use');
@@ -160,14 +236,16 @@ export class FormsService {
     formId: string,
     dto: UpdateFormDraftInput,
     actor: AuthenticatedActor,
-  ) {
+    lockToken: string,
+  ): Promise<FormVersionDefinition> {
     const form = await this.findForm(workspaceId, formId);
     const dataset = await this.findManagedDataset(workspaceId, form.datasetId, actor);
     if (form.status === FormStatus.archived || dataset.status !== DatasetStatus.active) {
       throw new ConflictException('Form or Dataset is archived');
     }
+    await this.assertEditLock(workspaceId, formId, lockToken, actor.userId);
     this.validateMetadata(dto);
-    return this.prisma.$transaction(async (tx) => {
+    const saved = await this.prisma.$transaction(async (tx) => {
       const { schema, checksum } = await this.prepareFormSchema(tx, dataset, dto, actor.userId);
       const latest = await tx.formVersion.findFirst({
         where: { formId },
@@ -214,6 +292,7 @@ export class FormsService {
       }, tx);
       return version;
     });
+    return this.toVersionDefinition(saved);
   }
 
   /**
@@ -226,13 +305,15 @@ export class FormsService {
     formId: string,
     expectedRevision: number,
     actor: AuthenticatedActor,
-  ) {
+    lockToken: string,
+  ): Promise<FormVersionDefinition> {
     const form = await this.findForm(workspaceId, formId);
     const dataset = await this.findManagedDataset(workspaceId, form.datasetId, actor);
     if (form.status !== FormStatus.active || dataset.status !== DatasetStatus.active) {
       throw new ConflictException('Form and Dataset must be active');
     }
-    return this.prisma.$transaction(async (tx) => {
+    await this.assertEditLock(workspaceId, formId, lockToken, actor.userId);
+    const published = await this.prisma.$transaction(async (tx) => {
       const draft = await tx.formVersion.findFirst({
         where: { formId, state: FormVersionState.draft },
         orderBy: { version: 'desc' },
@@ -285,9 +366,10 @@ export class FormsService {
       }, tx);
       return tx.formVersion.findUniqueOrThrow({ where: { id: draft.id } });
     });
+    return this.toVersionDefinition(published);
   }
 
-  /** 变更 Form 状态（active/closed/archived）。已归档 Form 不可再变更。 */
+  /** 变更 Form 状态（active/closed/archived），归档 Form 仅允许恢复为 active。 */
   public async changeStatus(
     workspaceId: number,
     formId: string,
@@ -297,8 +379,13 @@ export class FormsService {
   ) {
     const form = await this.findForm(workspaceId, formId);
     await this.findManagedDataset(workspaceId, form.datasetId, actor);
-    if (form.status === FormStatus.archived) throw new ConflictException('Form is archived');
-    return this.prisma.$transaction(async (tx) => {
+    if (form.status === FormStatus.archived && status !== FormStatus.active) {
+      throw new ConflictException('Archived Form can only be restored');
+    }
+    if (form.status !== FormStatus.archived && status === FormStatus.active) {
+      throw new ConflictException('Form is not archived');
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.form.updateMany({
         where: { id: formId, workspaceId, revision: expectedRevision },
         data: { status, revision: { increment: 1 } },
@@ -316,6 +403,107 @@ export class FormsService {
       }, tx);
       return tx.form.findUniqueOrThrow({ where: { id: formId } });
     });
+    if (status === FormStatus.archived) {
+      await this.redis.del(this.editLockKey(workspaceId, formId));
+    }
+    return this.toFormSummary(updated);
+  }
+
+  /** 为单个编辑会话获取 Redis TTL 锁。 */
+  public async acquireEditLock(
+    workspaceId: number,
+    formId: string,
+    actor: AuthenticatedActor,
+  ): Promise<AcquireFormEditLockResult> {
+    const form = await this.findForm(workspaceId, formId);
+    await this.findManagedDataset(workspaceId, form.datasetId, actor);
+    if (form.status === FormStatus.archived) throw new ConflictException('Form is archived');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: actor.userId },
+      select: { name: true, nickname: true, username: true },
+    });
+    const token = randomUUID();
+    const record: FormEditLockRecord = {
+      userId: actor.userId,
+      holderName: user?.nickname || user?.name || user?.username || actor.userId,
+      lockedAt: new Date().toISOString(),
+      token,
+    };
+    const key = this.editLockKey(workspaceId, formId);
+    const acquired = await this.redis.set(
+      key,
+      JSON.stringify(record),
+      'EX',
+      editLockTtlSeconds,
+      'NX',
+    );
+    if (acquired !== 'OK') {
+      const holder = this.parseLock(await this.redis.get(key));
+      throw new ConflictException(holder
+        ? `Form is being edited by ${holder.holderName}`
+        : 'Form edit lock is temporarily unavailable');
+    }
+    return {
+      expiresIn: editLockTtlSeconds,
+      lock: this.toLockSummary(record),
+      token,
+    };
+  }
+
+  /** 仅匹配 token 与持有者的会话可以延长锁。 */
+  public async heartbeatEditLock(
+    workspaceId: number,
+    formId: string,
+    token: string,
+    actor: AuthenticatedActor,
+  ): Promise<HeartbeatFormEditLockResult> {
+    const form = await this.findForm(workspaceId, formId);
+    await this.findManagedDataset(workspaceId, form.datasetId, actor);
+    if (form.status === FormStatus.archived) throw new ConflictException('Form is archived');
+    const extended = await this.redis.eval(
+      `local value = redis.call('GET', KEYS[1])
+if not value then return 0 end
+local lock = cjson.decode(value)
+if lock.token ~= ARGV[1] or lock.userId ~= ARGV[2] then return 0 end
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+return 1`,
+      1,
+      this.editLockKey(workspaceId, formId),
+      token,
+      actor.userId,
+      String(editLockTtlSeconds),
+    );
+    if (Number(extended) !== 1) {
+      throw new ConflictException('Form edit lock is missing, expired, or owned by another session');
+    }
+    return { expiresIn: editLockTtlSeconds };
+  }
+
+  /** 仅匹配 token 与持有者的会话可以原子释放锁。 */
+  public async releaseEditLock(
+    workspaceId: number,
+    formId: string,
+    token: string,
+    actor: AuthenticatedActor,
+  ): Promise<ReleaseFormEditLockResult> {
+    const form = await this.findForm(workspaceId, formId);
+    await this.findManagedDataset(workspaceId, form.datasetId, actor);
+    const released = await this.redis.eval(
+      `local value = redis.call('GET', KEYS[1])
+if not value then return 0 end
+local lock = cjson.decode(value)
+if lock.token ~= ARGV[1] or lock.userId ~= ARGV[2] then return 0 end
+return redis.call('DEL', KEYS[1])`,
+      1,
+      this.editLockKey(workspaceId, formId),
+      token,
+      actor.userId,
+    );
+    if (Number(released) !== 1) {
+      throw new ConflictException('Form edit lock is missing, expired, or owned by another session');
+    }
+    return { released: true };
   }
 
   /**
@@ -363,7 +551,7 @@ export class FormsService {
     const schema = form.activeVersion.schema as Record<string, unknown>;
     const property = (schema.properties as Record<string, Record<string, unknown>>)?.[itemId];
     if (!property) throw new NotFoundException('Form item not found');
-    const extension = property['x-orz'] as Record<string, unknown>;
+    const extension = property['x-form'] as Record<string, unknown>;
     const ui = extension.ui as Record<string, unknown> | undefined;
     const options = ui?.options as Record<string, unknown> | undefined;
     const field = await this.prisma.datasetField.findUnique({
@@ -392,6 +580,133 @@ export class FormsService {
         id: row.id,
         label: (row.values as Record<string, JsonValue>)[labelFieldId],
       }));
+  }
+
+  private toPanelSummary(
+    form: PanelFormRecord,
+    lock: FormEditLockSummary,
+  ): FormPanelSummary {
+    const definition = form.versions[0] ?? form.activeVersion;
+    return {
+      ...this.toFormSummary(form),
+      title: definition
+        ? resolveLocalizedText(
+          definition.nameI18n as Record<string, string>,
+          definition.defaultLocale,
+          definition.defaultLocale,
+        ) || form.slug
+        : form.slug,
+      creator: this.toCreatorSummary(form.createdBy),
+      hasDraft: form.versions.length > 0,
+      hasRelease: form.activeVersion !== null,
+      lock,
+    };
+  }
+
+  private toFormSummary(form: Pick<
+  Form,
+  | 'activeVersionId'
+  | 'createdAt'
+  | 'datasetId'
+  | 'id'
+  | 'revision'
+  | 'slug'
+  | 'status'
+  | 'updatedAt'
+  | 'workspaceId'
+  >): FormSummary {
+    return {
+      id: form.id,
+      workspaceId: form.workspaceId,
+      datasetId: form.datasetId,
+      slug: form.slug,
+      status: form.status,
+      activeVersionId: form.activeVersionId,
+      revision: form.revision,
+      createdAt: form.createdAt.toISOString(),
+      updatedAt: form.updatedAt.toISOString(),
+    };
+  }
+
+  private toVersionDefinition(
+    version: FormVersion,
+  ): FormVersionDefinition {
+    return {
+      id: version.id,
+      formId: version.formId,
+      version: version.version,
+      state: version.state,
+      defaultLocale: version.defaultLocale,
+      nameI18n: version.nameI18n as Record<string, string>,
+      descriptionI18n: version.descriptionI18n as Record<string, string> | null,
+      closingMessageI18n: version.closingMessageI18n as Record<string, string> | null,
+      opensAt: version.opensAt?.toISOString() ?? null,
+      closesAt: version.closesAt?.toISOString() ?? null,
+      submissionAccess: version.submissionAccess,
+      writeMode: version.writeMode,
+      schema: version.schema as FormVersionDefinition['schema'],
+      schemaChecksum: version.schemaChecksum,
+      revision: version.revision,
+    };
+  }
+
+  private toCreatorSummary(user: {
+    id: string;
+    name: string;
+    nickname: string;
+    username: string;
+  }): FormCreatorSummary {
+    return {
+      id: user.id,
+      displayName: user.nickname || user.name || user.username,
+    };
+  }
+
+  private editLockKey(workspaceId: number, formId: string): string {
+    return `form:edit-lock:${workspaceId}:${formId}`;
+  }
+
+  private parseLock(value: string | null): FormEditLockRecord | null {
+    if (!value) return null;
+    try {
+      const record = JSON.parse(value) as Partial<FormEditLockRecord>;
+      if (typeof record.userId !== 'string'
+        || typeof record.holderName !== 'string'
+        || typeof record.lockedAt !== 'string'
+        || typeof record.token !== 'string') return null;
+      return record as FormEditLockRecord;
+    } catch {
+      return null;
+    }
+  }
+
+  private toLockSummary(lock: FormEditLockRecord | null): FormEditLockSummary {
+    return lock
+      ? {
+        locked: true,
+        holderUserId: lock.userId,
+        holderName: lock.holderName,
+        lockedAt: lock.lockedAt,
+      }
+      : {
+        locked: false,
+        holderUserId: null,
+        holderName: null,
+        lockedAt: null,
+      };
+  }
+
+  private async assertEditLock(
+    workspaceId: number,
+    formId: string,
+    token: string,
+    userId: string,
+  ): Promise<void> {
+    const lock = this.parseLock(await this.redis.get(this.editLockKey(workspaceId, formId)));
+    if (!lock) throw new ConflictException('Form edit lock is missing or expired');
+    if (lock.token !== token || lock.userId !== userId) {
+      throw new ConflictException('Form edit lock belongs to another session');
+    }
   }
 
   /**
@@ -438,7 +753,7 @@ export class FormsService {
     schema: Record<string, unknown>,
     actorUserId: string,
   ): Promise<void> {
-    const root = schema['x-orz'] as Record<string, unknown> | undefined;
+    const root = schema['x-form'] as Record<string, unknown> | undefined;
     const capture = root?.capture as Record<string, { datasetFieldId: string }> | undefined;
     if (!capture || Object.keys(capture).length === 0) return;
     let created = false;

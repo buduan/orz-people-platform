@@ -8,8 +8,15 @@ import {
   canonicalizeJson,
   checksumJson,
   createFormItemId,
-  evaluateVisibleIf,
-  parseVisibleIf,
+  createInitialFormState,
+  evaluateAvailableIf,
+  getChoiceOptions,
+  getItemExtension,
+  getRequiredItemIds,
+  getRootExtension,
+  isItemVisible,
+  parseAvailableIf,
+  resolveLocalizedText,
   validateFormSchemaExtensions,
 } from '@orz-people-platform/utils';
 
@@ -30,8 +37,8 @@ describe('shared Form Schema utilities', () => {
     expect(second).not.toBe(first);
   });
 
-  it('parses and evaluates nested visibleIf expressions', () => {
-    const expression = parseVisibleIf({
+  it('parses and evaluates nested availableIf expressions', () => {
+    const expression = parseAvailableIf({
       operator: 'and',
       conditions: [
         { fieldId: 'q_role', operator: 'in', values: ['student', 'teacher'] },
@@ -42,26 +49,26 @@ describe('shared Form Schema utilities', () => {
       ],
     });
 
-    expect(evaluateVisibleIf(expression, { q_disabled: false, q_role: 'student' })).toBe(true);
-    expect(evaluateVisibleIf(expression, { q_disabled: true, q_role: 'student' })).toBe(false);
+    expect(evaluateAvailableIf(expression, { q_disabled: false, q_role: 'student' })).toBe(true);
+    expect(evaluateAvailableIf(expression, { q_disabled: true, q_role: 'student' })).toBe(false);
   });
 
-  it('rejects unknown visibleIf syntax and handles absent fields conservatively', () => {
-    expect(() => parseVisibleIf({ fieldId: 'q_role', operator: 'execute', value: 'x' }))
-      .toThrow('Unknown visibleIf operator');
-    expect(() => parseVisibleIf({
+  it('rejects unknown availableIf syntax and handles absent fields conservatively', () => {
+    expect(() => parseAvailableIf({ fieldId: 'q_role', operator: 'execute', value: 'x' }))
+      .toThrow('Unknown availableIf operator');
+    expect(() => parseAvailableIf({
       fieldId: 'q_role',
       operator: 'equals',
       unexpected: true,
       value: 'student',
-    })).toThrow('Unknown visibleIf property');
+    })).toThrow('Unknown availableIf property');
 
-    expect(evaluateVisibleIf(
-      parseVisibleIf({ fieldId: 'q_missing', operator: 'is_empty' }),
+    expect(evaluateAvailableIf(
+      parseAvailableIf({ fieldId: 'q_missing', operator: 'is_empty' }),
       {},
     )).toBe(true);
-    expect(evaluateVisibleIf(
-      parseVisibleIf({ fieldId: 'q_missing', operator: 'not_equals', value: 'student' }),
+    expect(evaluateAvailableIf(
+      parseAvailableIf({ fieldId: 'q_missing', operator: 'not_equals', value: 'student' }),
       {},
     )).toBe(false);
   });
@@ -70,7 +77,6 @@ describe('shared Form Schema utilities', () => {
     const ajv = new Ajv2020({ strict: true });
     addFormats(ajv);
     const schema = {
-      $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',
       additionalProperties: false,
       properties: {
@@ -90,7 +96,7 @@ describe('shared Form Schema utilities', () => {
     expect(validate({})).toBe(true);
   });
 
-  it('validates locale maps, field references, relation filters and x-orz keys', () => {
+  it('validates locale maps, field references, relation filters and x-form keys', () => {
     const controllingId = 'q_00000000-0000-4000-8000-000000000001';
     const dependentId = 'q_00000000-0000-4000-8000-000000000002';
     const schema = {
@@ -98,11 +104,11 @@ describe('shared Form Schema utilities', () => {
       properties: {
         [controllingId]: {
           type: 'string',
-          'x-orz': { datasetFieldId: 'dataset-field-1' },
+          'x-form': { datasetFieldId: 'dataset-field-1' },
         },
         [dependentId]: {
           type: 'string',
-          'x-orz': {
+          'x-form': {
             datasetFieldId: 'dataset-field-2',
             i18n: { title: { 'en-US': 'City', 'zh-CN': '城市' } },
             ui: {
@@ -118,14 +124,13 @@ describe('shared Form Schema utilities', () => {
                 },
               },
             },
-            visibleIf: { fieldId: controllingId, operator: 'not_equals', value: '' },
+            availableIf: { fieldId: controllingId, operator: 'not_equals', value: '' },
           },
         },
       },
-      'x-orz': {
+      'x-form': {
         version: 1,
         datasetId: 'dataset-1',
-        layout: [{ type: 'section', id: 'location', children: [controllingId, dependentId] }],
         capture: {},
       },
     };
@@ -133,13 +138,68 @@ describe('shared Form Schema utilities', () => {
     expect(() => validateFormSchemaExtensions(schema)).not.toThrow();
 
     const unknownExtension = structuredClone(schema);
-    Object.assign(unknownExtension.properties[dependentId]['x-orz'], { execute: 'script' });
+    Object.assign(unknownExtension.properties[dependentId]['x-form'], { execute: 'script' });
     expect(() => validateFormSchemaExtensions(unknownExtension))
-      .toThrow('Unknown Form item x-orz property');
+      .toThrow('Unknown Form item x-form property');
 
     const missingReference = structuredClone(schema);
-    missingReference.properties[dependentId]['x-orz'].visibleIf.fieldId = 'q_missing';
+    missingReference.properties[dependentId]['x-form'].availableIf.fieldId = 'q_missing';
     expect(() => validateFormSchemaExtensions(missingReference))
-      .toThrow('Unknown visibleIf Form item');
+      .toThrow('Unknown availableIf Form item');
+  });
+
+  it('soft-reads extensions, choices, locale text, and defaults without throwing', () => {
+    const itemId = 'q_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const schema = {
+      type: 'object',
+      properties: {
+        [itemId]: {
+          type: 'string',
+          default: 'engineering',
+          oneOf: [
+            {
+              const: 'engineering',
+              'x-form': { i18n: { title: { 'zh-CN': '研发', en: 'Eng' } } },
+            },
+            { const: 'design' },
+          ],
+          'x-form': {
+            datasetFieldId: 'fld_dept',
+            i18n: { title: { 'zh-CN': '部门', en: 'Dept' } },
+            ui: { widget: 'radio' },
+            availableIf: { fieldId: itemId, operator: 'is_not_empty' },
+          },
+        },
+      },
+      required: [itemId],
+      'x-form': {
+        version: 1,
+        datasetId: 'ds_1',
+        capture: {},
+      },
+    };
+
+    expect(resolveLocalizedText({ en: 'Hello', 'zh-CN': '你好' }, 'en')).toBe('Hello');
+    expect(resolveLocalizedText({ en: 'Hello' }, 'zh-CN')).toBe('Hello');
+    expect(resolveLocalizedText(
+      { en: 'Hello', fr: '', 'zh-CN': '你好' },
+      'fr',
+      'en',
+    )).toBe('Hello');
+    expect(getRootExtension(schema)?.datasetId).toBe('ds_1');
+    expect(getItemExtension(schema.properties[itemId])?.ui?.widget).toBe('radio');
+    expect(getRequiredItemIds(schema).has(itemId)).toBe(true);
+    expect(getChoiceOptions(schema.properties[itemId], 'zh-CN')).toEqual([
+      { label: '研发', value: 'engineering' },
+      { label: 'design', value: 'design' },
+    ]);
+    expect(getChoiceOptions(schema.properties[itemId], 'fr', 'en')).toEqual([
+      { label: 'Eng', value: 'engineering' },
+      { label: 'design', value: 'design' },
+    ]);
+    expect(createInitialFormState(schema)).toEqual({ [itemId]: 'engineering' });
+    expect(isItemVisible(getItemExtension(schema.properties[itemId]), { [itemId]: 'x' })).toBe(true);
+    expect(isItemVisible(getItemExtension(schema.properties[itemId]), {})).toBe(false);
+    expect(getRootExtension(true)).toBeNull();
   });
 });

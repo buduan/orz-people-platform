@@ -1,6 +1,7 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import {
   DatasetCollaboratorRole,
+  DatasetFieldKind,
   DatasetStatus,
   MemberStatus,
 } from '@prisma/client';
@@ -89,5 +90,33 @@ describe('Dataset mutation invariants', () => {
       expectedRevision: 1,
       name: 'New name',
     }, actor)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rejects field creation by a non-manager', async () => {
+    const restrictedActor: AuthenticatedActor = {
+      ...actor,
+      isWorkspaceAdmin: false,
+      permissions: [],
+    };
+    const prisma = {
+      dataset: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'dataset-1',
+          workspaceId: 1,
+          status: DatasetStatus.active,
+        }),
+      },
+      workspaceMember: { findUnique: vi.fn().mockResolvedValue({ id: 'member-1' }) },
+      datasetCollaborator: { findUnique: vi.fn().mockResolvedValue(null) },
+    };
+
+    await expect(createService(prisma).createField(1, 'dataset-1', {
+      key: 'nickname',
+      name: 'Nickname',
+      kind: DatasetFieldKind.text,
+      valueSchema: { type: 'string' },
+      config: {},
+      required: false,
+    }, restrictedActor)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
