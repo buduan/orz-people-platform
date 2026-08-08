@@ -6,6 +6,7 @@ import type {
   JsonSchemaObject,
   JsonValue,
   LocalizedText,
+  RelationFilterExpression,
   RelationFilterOperator,
   AvailableIfExpression,
 } from '@orz-people-platform/types';
@@ -281,6 +282,51 @@ export function isItemVisible(
 ): boolean {
   if (!extension?.availableIf) return true;
   return evaluateAvailableIf(extension.availableIf, state);
+}
+
+/** Return submitted item IDs whose availableIf currently evaluates to false. */
+export function findUnavailableSubmittedItemIds(
+  schema: JsonSchema,
+  answers: Readonly<Record<FormItemId, JsonValue | undefined>>,
+): FormItemId[] {
+  const properties = getSchemaProperties(schema);
+  if (!properties) return [];
+  return Object.keys(answers).filter((itemId) => {
+    if (answers[itemId] === undefined) return false;
+    const property = properties[itemId];
+    return property !== undefined && !isItemVisible(getItemExtension(property), answers);
+  });
+}
+
+/** Keep only declared Form items that are visible under the same answer snapshot. */
+export function filterVisibleAnswers(
+  schema: JsonSchema,
+  answers: Readonly<Record<FormItemId, JsonValue | undefined>>,
+): Record<FormItemId, JsonValue> {
+  const properties = getSchemaProperties(schema);
+  if (!properties) return {};
+  return Object.fromEntries(
+    Object.entries(answers).flatMap(([itemId, value]) => {
+      const property = properties[itemId];
+      if (
+        value === undefined
+        || property === undefined
+        || !isItemVisible(getItemExtension(property), answers)
+      ) return [];
+      return [[itemId, value]];
+    }),
+  );
+}
+
+/** Extract the unique Form item dependencies declared by relation filter valueFrom. */
+export function getRelationFilterDependencies(
+  filter: RelationFilterExpression | undefined,
+): FormItemId[] {
+  if (!filter) return [];
+  const conditions = filter.all ?? filter.any ?? [];
+  return [...new Set(conditions.flatMap((condition) => (
+    condition.valueFrom ? [condition.valueFrom] : []
+  )))];
 }
 
 /** 读取单个 property 的默认值。 */

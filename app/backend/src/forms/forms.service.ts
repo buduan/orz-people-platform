@@ -26,10 +26,12 @@ import type {
   FormListSection,
   FormPanelDetail,
   FormPanelSummary,
+  FormRelationOption,
   FormSummary,
   FormVersionDefinition,
   HeartbeatFormEditLockResult,
   JsonValue,
+  PublishedFormDefinition,
   ReleaseFormEditLockResult,
   RelationFilterCondition,
   RelationFilterExpression,
@@ -506,33 +508,25 @@ return redis.call('DEL', KEYS[1])`,
     return { released: true };
   }
 
-  /**
-   * 按 slug 获取已发布的 Form 公开版本。
-   * 根据请求 locale 选择最佳 i18n 文案；返回结构化读模型而非原始数据库记录。
-   */
-  public async getPublished(slug: string, locale?: string) {
-    const form = await this.findPublishedForm(slug);
+  /** 按全局 Form ID 获取公开填写所需的最小已发布定义。 */
+  public async getPublished(formId: string): Promise<PublishedFormDefinition> {
+    const form = await this.findPublishedForm(formId);
     const version = form.activeVersion;
-    const selectedLocale = this.selectLocale(
-      version.nameI18n as Record<string, string>,
-      locale,
-      version.defaultLocale,
-    );
+    const availability = this.publishedAvailability(form);
     return {
       id: form.id,
-      slug: form.slug,
       version: version.version,
-      locale: selectedLocale,
-      name: (version.nameI18n as Record<string, string>)[selectedLocale],
-      description: (version.descriptionI18n as Record<string, string> | null)
-        ?.[selectedLocale] ?? null,
-      closingMessage: (version.closingMessageI18n as Record<string, string> | null)
-        ?.[selectedLocale] ?? null,
-      opensAt: version.opensAt,
-      closesAt: version.closesAt,
+      defaultLocale: version.defaultLocale,
+      nameI18n: version.nameI18n as Record<string, string>,
+      descriptionI18n: version.descriptionI18n as Record<string, string> | null,
+      closingMessageI18n: version.closingMessageI18n as Record<string, string> | null,
+      opensAt: version.opensAt?.toISOString() ?? null,
+      closesAt: version.closesAt?.toISOString() ?? null,
       submissionAccess: version.submissionAccess,
       writeMode: version.writeMode,
-      schema: version.schema,
+      schema: version.schema as PublishedFormDefinition['schema'],
+      ...availability,
+      submissionContext: null,
     };
   }
 
@@ -542,12 +536,15 @@ return redis.call('DEL', KEYS[1])`,
    * 并仅返回 row ID 和 label 字段值。
    */
   public async relationOptions(
-    slug: string,
+    formId: string,
     itemId: string,
     rawValues: string | undefined,
     take: number,
-  ) {
-    const form = await this.findPublishedForm(slug);
+  ): Promise<FormRelationOption[]> {
+    if (!Number.isInteger(take) || take < 1 || take > 100) {
+      throw new BadRequestException('Relation option take must be between 1 and 100');
+    }
+    const form = await this.findPublishedForm(formId);
     const schema = form.activeVersion.schema as Record<string, unknown>;
     const property = (schema.properties as Record<string, Record<string, unknown>>)?.[itemId];
     if (!property) throw new NotFoundException('Form item not found');
@@ -557,7 +554,12 @@ return redis.call('DEL', KEYS[1])`,
     const field = await this.prisma.datasetField.findUnique({
       where: { id: extension.datasetFieldId as string },
     });
-    if (!field || field.kind !== DatasetFieldKind.relation || !field.relationTargetDatasetId) {
+    if (!field
+      || field.datasetId !== form.datasetId
+      || field.archivedAt
+      || field.kind !== DatasetFieldKind.relation
+      || !field.relationTargetDatasetId
+      || typeof options?.labelFieldId !== 'string') {
       throw new BadRequestException('Form item is not a relation selector');
     }
     const values = this.parseCurrentValues(rawValues);
@@ -576,10 +578,10 @@ return redis.call('DEL', KEYS[1])`,
         values,
       ))
       .slice(0, take)
-      .map((row) => ({
-        id: row.id,
-        label: (row.values as Record<string, JsonValue>)[labelFieldId],
-      }));
+      .map((row) => {
+        const label = (row.values as Record<string, JsonValue>)[labelFieldId];
+        return { id: row.id, label: label === undefined || label === null ? '' : String(label) };
+      });
   }
 
   private toPanelSummary(
@@ -876,15 +878,6 @@ return redis.call('DEL', KEYS[1])`,
     return dataset;
   }
 
-  /** 根据请求的 locale 和默认语言选择最佳 i18n 文案语言。 */
-  private selectLocale(
-    map: Record<string, string>,
-    requested: string | undefined,
-    fallback: string,
-  ): string {
-    return requested && Object.hasOwn(map, requested) ? requested : fallback;
-  }
-
   /** 将 URL 参数中的 JSON 字符串解析为当前表单值对象，供关联筛选使用。 */
   private parseCurrentValues(raw: string | undefined): Record<string, JsonValue> {
     if (!raw) return {};
@@ -959,15 +952,39 @@ return redis.call('DEL', KEYS[1])`,
    * 查找已发布的 Form（含 activeVersion），未找到或状态异常时抛出 NotFoundException。
    * 返回类型已确保 activeVersion 非 null。
    */
-  private async findPublishedForm(slug: string) {
+  private async findPublishedForm(formId: string) {
     const form = await this.prisma.form.findUnique({
-      where: { workspaceId_slug: { workspaceId: 1, slug } },
-      include: { activeVersion: true },
+      where: { id: formId },
+      include: { activeVersion: true, dataset: true },
     });
-    if (!form || form.status !== FormStatus.active || !form.activeVersion) {
+    if (!form
+      || form.status === FormStatus.archived
+      || !form.activeVersion
+      || form.activeVersion.state !== FormVersionState.published) {
       throw new NotFoundException('Published Form not found');
     }
     // 经过上述校验后 activeVersion 必然非 null，显式断言使调用方无需重复检查。
     return form as typeof form & { activeVersion: NonNullable<typeof form.activeVersion> };
+  }
+
+  /** Derive a stable public availability state without exposing management details. */
+  private publishedAvailability(form: Awaited<ReturnType<FormsService['findPublishedForm']>>): Pick<
+  PublishedFormDefinition,
+  'acceptingSubmissions' | 'unavailableReason'
+  > {
+    if (form.status === FormStatus.closed) {
+      return { acceptingSubmissions: false, unavailableReason: 'closed' };
+    }
+    if (form.dataset.status !== DatasetStatus.active) {
+      return { acceptingSubmissions: false, unavailableReason: 'inactive' };
+    }
+    const now = new Date();
+    if (form.activeVersion.opensAt && now < form.activeVersion.opensAt) {
+      return { acceptingSubmissions: false, unavailableReason: 'not_started' };
+    }
+    if (form.activeVersion.closesAt && now > form.activeVersion.closesAt) {
+      return { acceptingSubmissions: false, unavailableReason: 'closed' };
+    }
+    return { acceptingSubmissions: true, unavailableReason: null };
   }
 }

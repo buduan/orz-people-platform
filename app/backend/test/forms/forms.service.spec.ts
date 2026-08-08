@@ -1,5 +1,10 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  DatasetFieldKind,
   DatasetStatus,
   DatasetSubjectMode,
   DatasetType,
@@ -239,5 +244,162 @@ describe('Form definition validation', () => {
       submissionAccess: FormSubmissionAccess.anonymous_allowed,
       writeMode: FormWriteMode.create_row,
     })).toThrow(BadRequestException);
+  });
+});
+
+function publicForm(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'form-public',
+    workspaceId: 42,
+    datasetId: 'dataset-public',
+    slug: 'not-used-for-public-lookup',
+    status: FormStatus.active,
+    dataset: { status: DatasetStatus.active },
+    activeVersion: {
+      id: 'version-public',
+      version: 3,
+      state: FormVersionState.published,
+      defaultLocale: 'zh-CN',
+      nameI18n: { 'zh-CN': '公开表单', en: 'Public Form' },
+      descriptionI18n: { 'zh-CN': '说明' },
+      closingMessageI18n: null,
+      opensAt: null,
+      closesAt: null,
+      submissionAccess: FormSubmissionAccess.anonymous_allowed,
+      writeMode: FormWriteMode.create_row,
+      schema: { type: 'object', properties: {} },
+      schemaChecksum: 'internal-checksum',
+      revision: 9,
+    },
+    ...overrides,
+  };
+}
+
+function publicService(prisma: object): FormsService {
+  return new FormsService(
+    prisma as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
+}
+
+describe('Published Form filling projection', () => {
+  it('loads a published Form by global ID outside Workspace 1 without exposing management data', async () => {
+    const prisma = { form: { findUnique: vi.fn().mockResolvedValue(publicForm()) } };
+
+    const result = await publicService(prisma).getPublished('form-public');
+
+    expect(prisma.form.findUnique).toHaveBeenCalledWith({
+      where: { id: 'form-public' },
+      include: { activeVersion: true, dataset: true },
+    });
+    expect(result).toMatchObject({
+      id: 'form-public',
+      version: 3,
+      defaultLocale: 'zh-CN',
+      acceptingSubmissions: true,
+      unavailableReason: null,
+      submissionContext: null,
+    });
+    expect(result).not.toHaveProperty('slug');
+    expect(result).not.toHaveProperty('schemaChecksum');
+    expect(result).not.toHaveProperty('revision');
+  });
+
+  it.each([
+    [
+      publicForm({
+        activeVersion: {
+          ...publicForm().activeVersion,
+          opensAt: new Date('2999-01-01T00:00:00.000Z'),
+        },
+      }),
+      'not_started',
+    ],
+    [publicForm({ status: FormStatus.closed }), 'closed'],
+    [publicForm({ dataset: { status: DatasetStatus.archived } }), 'inactive'],
+  ])('reports unavailable published states without hiding the definition', async (record, reason) => {
+    const result = await publicService({
+      form: { findUnique: vi.fn().mockResolvedValue(record) },
+    }).getPublished('form-public');
+
+    expect(result).toMatchObject({
+      acceptingSubmissions: false,
+      unavailableReason: reason,
+    });
+  });
+
+  it('returns not found for archived Forms and missing published releases', async () => {
+    const findUnique = vi.fn()
+      .mockResolvedValueOnce(publicForm({ status: FormStatus.archived }))
+      .mockResolvedValueOnce(publicForm({ activeVersion: null }));
+    const forms = publicService({ form: { findUnique } });
+
+    await expect(forms.getPublished('archived')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(forms.getPublished('unpublished')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('filters relation rows from declared values and returns only opaque IDs/string labels', async () => {
+    const countryItemId = 'q_00000000-0000-4000-8000-000000000001';
+    const cityItemId = 'q_00000000-0000-4000-8000-000000000002';
+    const record = publicForm({
+      activeVersion: {
+        ...publicForm().activeVersion,
+        schema: {
+          type: 'object',
+          properties: {
+            [cityItemId]: {
+              type: 'string',
+              'x-form': {
+                datasetFieldId: 'field-city',
+                ui: {
+                  widget: 'dataset-select',
+                  options: {
+                    labelFieldId: 'field-label',
+                    filter: {
+                      all: [{
+                        fieldId: 'field-country',
+                        operator: 'equals',
+                        valueFrom: countryItemId,
+                      }],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const prisma = {
+      form: { findUnique: vi.fn().mockResolvedValue(record) },
+      datasetField: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'field-city',
+          datasetId: 'dataset-public',
+          archivedAt: null,
+          kind: DatasetFieldKind.relation,
+          relationTargetDatasetId: 'dataset-cities',
+        }),
+      },
+      datasetRow: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'row-beijing', values: { 'field-country': 'CN', 'field-label': '北京' } },
+          { id: 'row-paris', values: { 'field-country': 'FR', 'field-label': 'Paris' } },
+        ]),
+      },
+    };
+
+    const result = await publicService(prisma).relationOptions(
+      'form-public',
+      cityItemId,
+      JSON.stringify({ [countryItemId]: 'CN' }),
+      10,
+    );
+
+    expect(result).toEqual([{ id: 'row-beijing', label: '北京' }]);
+    expect(result[0]).toEqual({ id: 'row-beijing', label: '北京' });
   });
 });

@@ -13,17 +13,20 @@
 - Form 面板 API：按主列表/归档列表读取、详情的最新 draft/当前 release 投影、创建、完整草稿
   保存、发布、归档/恢复，以及 Redis 独占编辑锁。
 - Form 编辑器所需 Dataset API：按现有可见性列出/读取 Dataset，并复用领域服务创建字段。
+- Form 公开填写 API：按全局 `Form.id` 读取最小 published 定义和安全 relation 选项，支持匿名/
+  登录可选认证、主体行预填、隐藏字段拒绝、Redis 限频、幂等提交和最小成功响应。
 
 ## 已实现但暂未暴露 HTTP API 的领域能力
 
-`FormSubmissionsModule` 和 `SpecialDatasetsModule` 当前只注册领域服务。Dataset 与 Form 已暴露面板
-所需的有限 GET/POST action API；其余完整管理能力仍仅供后端内部模块调用。
+`SpecialDatasetsModule` 当前只注册领域服务。Dataset 与 Form 已暴露面板和公开填写所需的有限
+GET/POST action API；其余完整管理能力仍仅供后端内部模块调用。
 
 - Dataset：`standard`、`members`、`join_requests` 和 `activity_registrations` 类型，字段定义、JSON Schema 值校验、行数据、关系字段、协作者和归档。
 - 历史与并发：Dataset 定义快照、Dataset 行版本、软删除/恢复和基于 `revision` 的乐观并发控制。
 - 特殊数据：成员资料同步、游客加入申请及批准/拒绝、活动及活动报名绑定。
 - Form：JSON Schema（AJV Draft 2020-12 方言，不要求 `$schema`）、受控 `x-form` 扩展、多语言文案、`availableIf`、关联字段筛选、草稿/发布版本和匿名/登录提交策略。详见 [form-schema.md](./form-schema.md)。
-- Form 提交：`create_row`、`update_subject_row`、AJV 校验、设备信息采集、幂等键、规范化 JSON checksum 和事务性写入。
+- Form 提交领域服务：`create_row`、`update_subject_row`、AJV 校验、设备信息采集、规范化 JSON
+  checksum、关系/特殊 Dataset 校验和事务性写入；公开入口已由 `FormSubmissionsController` 暴露。
 
 ## 当前前端能力
 
@@ -36,5 +39,7 @@
   支持默认语言优先的多语言编辑、Dataset 字段绑定/创建、Header 保存/发布及编辑锁状态。
 - Header「源码」通过客户端懒加载 Monaco 编辑完整 JSON Schema，失败时保留源码，成功后走与
   可视化编辑相同的完整草稿保存路径。
+- `/form/:id` 公开填写页：SSR-safe published 加载、多语言、开放/关闭/登录/主体行状态、现有
+  `FormRenderer` 填写态、动态 relation 选项、Ajv 即时错误、幂等提交和本地化成功文案。
 
 `/dashboard` 当前是布局调试页。`/people`、`/organization`、`/access` 和 `/settings` 目前只是导航目标，尚未提供对应页面。

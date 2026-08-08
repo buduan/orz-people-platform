@@ -10,7 +10,10 @@ import type { AuthenticatedActor } from '@orz-people-platform/types';
 import { AuthSettingsService } from '../auth/auth-settings.service';
 import { SessionService } from '../auth/session.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { IS_PUBLIC_KEY } from './authorization.decorators';
+import {
+  IS_OPTIONAL_AUTHENTICATION_KEY,
+  IS_PUBLIC_KEY,
+} from './authorization.decorators';
 import { AuthorizationService } from './authorization.service';
 
 interface AccessPayload {
@@ -44,11 +47,21 @@ export class AuthenticationGuard implements CanActivate {
     if (isPublic) {
       return true;
     }
+    const isOptional = this.reflector.getAllAndOverride<boolean>(
+      IS_OPTIONAL_AUTHENTICATION_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     const request = context.switchToHttp().getRequest<HttpRequest>();
-    const [scheme, token] = request.headers.authorization?.split(' ') ?? [];
-    if (scheme !== 'Bearer' || !token) {
+    const authorizationHeader = request.headers.authorization;
+    if (!authorizationHeader) {
+      if (isOptional) return true;
       throw new UnauthorizedException('Bearer access token required');
     }
+    const [scheme, token, ...extra] = authorizationHeader.split(' ');
+    if (scheme !== 'Bearer' || !token) {
+      throw new UnauthorizedException('Invalid access token');
+    }
+    if (extra.length > 0) throw new UnauthorizedException('Invalid access token');
     let payload: AccessPayload;
     try {
       payload = await this.jwt.verifyAsync<AccessPayload>(token, {
