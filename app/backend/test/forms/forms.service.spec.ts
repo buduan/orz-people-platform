@@ -148,7 +148,12 @@ describe('Form panel projection and edit locks', () => {
         }]),
       },
     };
-    const datasets = { list: vi.fn().mockResolvedValue([{ id: 'dataset-1' }]) };
+    const datasets = {
+      list: vi.fn().mockResolvedValue({
+        items: [{ id: 'dataset-1' }],
+        canCreate: false,
+      }),
+    };
     const service = new FormsService(
       prisma as never,
       datasets as never,

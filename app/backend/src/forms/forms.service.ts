@@ -124,7 +124,7 @@ export class FormsService {
     if (actor.workspaceId !== workspaceId) throw new NotFoundException('Workspace not found');
     const datasetIds = actor.permissions.includes('form.manage_all')
       ? undefined
-      : (await this.datasets.list(workspaceId, actor)).map((dataset) => dataset.id);
+      : (await this.datasets.list(workspaceId, actor)).items.map((dataset) => dataset.id);
     let status: Prisma.EnumFormStatusFilter | FormStatus | undefined;
     if (section === 'main') status = { in: [FormStatus.active, FormStatus.closed] };
     if (section === 'archived') status = FormStatus.archived;

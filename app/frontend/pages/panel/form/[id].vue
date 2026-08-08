@@ -4,7 +4,7 @@ import type { editor as MonacoEditor } from 'monaco-editor';
 import { useIntervalFn } from '@vueuse/core';
 import type {
   AcquireFormEditLockResult,
-  CreateDatasetFieldRequest,
+  CreateDatasetPanelFieldRequest,
   DatasetFieldDefinition,
   DatasetPanelDetail,
   FormDraftDefinitionInput,
@@ -335,7 +335,7 @@ function addLocale(locale: string): void {
   activeLocale.value = locale;
 }
 
-async function createDatasetField(request: CreateDatasetFieldRequest): Promise<void> {
+async function createDatasetField(request: CreateDatasetPanelFieldRequest): Promise<void> {
   try {
     const field = await $api.post<DatasetFieldDefinition>(
       apiPath('datasets', 'createDatasetField'),

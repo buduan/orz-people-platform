@@ -1,24 +1,22 @@
 import type {
   DatasetFieldDefinition,
   DatasetFieldKind,
+  DatasetOption,
   DatasetSummary,
+  DatasetTableQuery,
+  DatasetWindowQueryRequest,
+  DatasetWindowQueryResponse,
   JsonObject,
   JsonValue,
   RelationCardinality,
 } from '@orz-people-platform/types';
 import {
   applyDatasetQuery,
-  getDatasetCellValue,
+  canonicalizeDatasetQuery,
+  createDatasetGroupDirectory,
+  getDatasetQueryFingerprint,
 } from '~/components/dataset/dataset-query';
-import type {
-  DatasetAggregateRule,
-  DatasetGroupSummary,
-  DatasetOption,
-  DatasetTableQuery,
-  DatasetTableRow,
-  DatasetWindowQueryRequest,
-  DatasetWindowQueryResponse,
-} from '~/components/dataset/types';
+import type { DatasetTableRow } from '~/components/dataset/types';
 
 export const DATASET_PREVIEW_ROW_COUNT = 5_000;
 export const DATASET_PREVIEW_FIELD_COUNT = 100;
@@ -303,96 +301,16 @@ export function createEmptyDatasetPreviewRow(sequence: number): DatasetTableRow 
   };
 }
 
-function stableHash(value: string): string {
-  let hash = 5381;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 33 + value.charCodeAt(index)) % 2147483647;
-  }
-  return hash.toString(36);
-}
-
 export function canonicalizeDatasetPreviewQuery(query: DatasetTableQuery): string {
-  return JSON.stringify({
-    filters: query.filters,
-    sorts: query.sorts,
-    group: query.group,
-  });
+  return canonicalizeDatasetQuery(query);
 }
 
 export function getDatasetPreviewQueryFingerprint(query: DatasetTableQuery): string {
-  return `preview-${stableHash(JSON.stringify({
+  return getDatasetQueryFingerprint({
     workspaceId: datasetPreviewDataset.workspaceId,
     datasetId: datasetPreviewDataset.id,
-    revision: datasetPreviewDataset.revision,
-    query: canonicalizeDatasetPreviewQuery(query),
-  }))}`;
-}
-
-function isEmpty(value: JsonValue): boolean {
-  return value === null || value === '' || (Array.isArray(value) && value.length === 0);
-}
-
-function aggregateRows(
-  rows: readonly DatasetTableRow[],
-  fields: readonly DatasetFieldDefinition[],
-  rule: DatasetAggregateRule,
-): JsonValue {
-  const field = fields.find((item) => item.id === rule.fieldId);
-  if (!field) return null;
-  const values = rows
-    .map((row) => getDatasetCellValue(row, field))
-    .filter((value) => !isEmpty(value));
-  if (rule.operation === 'count_non_empty') return values.length;
-  if (values.length === 0) return null;
-
-  if (field.kind === 'number') {
-    const numbers = values.map(Number).filter((value) => Number.isFinite(value));
-    if (numbers.length === 0) return null;
-    const sum = numbers.reduce((total, value) => total + value, 0);
-    if (rule.operation === 'sum') return sum;
-    if (rule.operation === 'avg') return sum / numbers.length;
-    return rule.operation === 'min' ? Math.min(...numbers) : Math.max(...numbers);
-  }
-
-  const strings = values.map(String).sort((left, right) => left.localeCompare(right));
-  return rule.operation === 'min' ? strings[0] ?? null : strings.at(-1) ?? null;
-}
-
-function createGroupDirectory(
-  rows: readonly DatasetTableRow[],
-  fields: readonly DatasetFieldDefinition[],
-  query: DatasetTableQuery,
-): DatasetGroupSummary[] | undefined {
-  const groupRule = query.group;
-  if (!groupRule) return undefined;
-  const field = fields.find((item) => item.id === groupRule.fieldId);
-  if (!field) return [];
-
-  const groups: Array<{
-    key: JsonValue;
-    startRowIndex: number;
-    rows: DatasetTableRow[];
-  }> = [];
-  rows.forEach((row, rowIndex) => {
-    const key = getDatasetCellValue(row, field);
-    const previous = groups.at(-1);
-    if (!previous || JSON.stringify(previous.key) !== JSON.stringify(key)) {
-      groups.push({ key, startRowIndex: rowIndex, rows: [row] });
-    } else {
-      previous.rows.push(row);
-    }
-  });
-
-  return groups.map((group) => ({
-    groupId: `group-${stableHash(`${field.id}:${JSON.stringify(group.key)}`)}`,
-    groupKey: group.key,
-    startRowIndex: group.startRowIndex,
-    rowCount: group.rows.length,
-    aggregates: Object.fromEntries(groupRule.aggregates.map((rule) => [
-      rule.id,
-      aggregateRows(group.rows, fields, rule),
-    ])),
-  }));
+    definitionRevision: datasetPreviewDataset.revision,
+  }, query);
 }
 
 function waitForMockLatency(signal: AbortSignal): Promise<void> {
@@ -429,7 +347,7 @@ export async function queryDatasetPreviewWindow(
     startIndex,
     items: queriedRows.slice(startIndex, startIndex + request.window.limit),
     ...(request.includeGroupDirectory
-      ? { groups: createGroupDirectory(queriedRows, fields, request.query) }
+      ? { groups: createDatasetGroupDirectory(queriedRows, fields, request.query) }
       : {}),
   };
 }

@@ -84,6 +84,35 @@ export interface DatasetSummary {
   updatedAt: string;
 }
 
+/** Dataset 安全创建者摘要，不暴露邮箱等账号信息。 */
+export interface DatasetCreatorSummary {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+/** 服务端按用户、Workspace、状态和 Dataset 类型计算的操作能力。 */
+export interface DatasetCapabilities {
+  canUpdateMetadata: boolean;
+  canArchive: boolean;
+  canManageFields: boolean;
+  canCreateRows: boolean;
+  canUpdateRows: boolean;
+  canDeleteRows: boolean;
+}
+
+/** Dataset 列表行。 */
+export interface DatasetListItem extends DatasetSummary {
+  creator: DatasetCreatorSummary;
+  capabilities: DatasetCapabilities;
+}
+
+/** Workspace Dataset 列表响应。 */
+export interface DatasetListResponse {
+  items: DatasetListItem[];
+  canCreate: boolean;
+}
+
 /** Dataset 字段定义。 */
 export interface DatasetFieldDefinition {
   id: string;
@@ -108,24 +137,17 @@ export interface DatasetFieldDefinition {
   archivedAt: string | null;
 }
 
-/** Form 面板所需的 Dataset 详情。 */
-export interface DatasetPanelDetail extends DatasetSummary {
+/** Dataset 详情响应。 */
+export interface DatasetDetailResponse {
+  dataset: DatasetSummary;
   fields: DatasetFieldDefinition[];
+  creator: DatasetCreatorSummary;
+  capabilities: DatasetCapabilities;
 }
 
-/** Form 编辑器内创建 Dataset 字段的请求。 */
-export interface CreateDatasetFieldRequest {
-  datasetId: string;
-  key: string;
-  name: string;
-  description?: string;
-  kind: DatasetFieldKind;
-  valueSchema: JsonSchema;
-  config: JsonObject;
-  required: boolean;
-  relationTargetDatasetId?: string;
-  relationCardinality?: RelationCardinality;
-  position?: number;
+/** Form 面板兼容接口所需的 Dataset 详情。 */
+export interface DatasetPanelDetail extends DatasetSummary {
+  fields: DatasetFieldDefinition[];
 }
 
 /** Dataset 行数据（含合并后的关联关系）。 */
@@ -140,6 +162,199 @@ export interface DatasetRowData {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+}
+
+// ---- 查询与绝对窗口 ----
+
+export type DatasetQueryKind = 'filter' | 'sort' | 'group';
+
+export type DatasetFilterOperator =
+  | 'contains'
+  | 'equals'
+  | 'not_equals'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'is_empty'
+  | 'is_not_empty'
+  | 'contains_any'
+  | 'contains_all'
+  | 'not_contains';
+
+export interface DatasetFilterRule {
+  id: string;
+  fieldId: string;
+  operator: DatasetFilterOperator;
+  value?: JsonValue;
+}
+
+export interface DatasetSortRule {
+  id: string;
+  fieldId: string;
+  direction: 'asc' | 'desc';
+}
+
+export type DatasetAggregateOperation =
+  | 'sum'
+  | 'avg'
+  | 'min'
+  | 'max'
+  | 'count_non_empty';
+
+export interface DatasetAggregateRule {
+  id: string;
+  fieldId: string;
+  operation: DatasetAggregateOperation;
+}
+
+export interface DatasetGroupRule {
+  fieldId: string;
+  aggregates: DatasetAggregateRule[];
+}
+
+export interface DatasetTableQuery {
+  filters: DatasetFilterRule[];
+  sorts: DatasetSortRule[];
+  group: DatasetGroupRule | null;
+}
+
+export interface DatasetGroupSummary {
+  groupId: string;
+  groupKey: JsonValue | null;
+  startRowIndex: number;
+  rowCount: number;
+  aggregates: Record<string, JsonValue>;
+}
+
+export interface DatasetRowRange {
+  startIndex: number;
+  endIndex: number;
+}
+
+export interface DatasetWindowQueryScope {
+  workspaceId: number | string;
+  datasetId: string;
+  definitionRevision: number;
+}
+
+export interface DatasetWindowQueryRequest {
+  query: DatasetTableQuery;
+  window: {
+    offset: number;
+    limit: number;
+  };
+  includeGroupDirectory?: boolean;
+}
+
+export interface DatasetWindowQueryResponse {
+  queryFingerprint: string;
+  totalRowCount: number;
+  startIndex: number;
+  items: DatasetRowData[];
+  groups?: DatasetGroupSummary[];
+}
+
+export interface DatasetOption {
+  label: string;
+  value: string;
+}
+
+export interface DatasetRelationOptionPage {
+  items: DatasetOption[];
+  nextCursor: string | null;
+}
+
+// ---- HTTP 变更契约 ----
+
+export interface CreateDatasetRequest {
+  name: string;
+  slug: string;
+  description?: string | null;
+  type: Extract<DatasetType, 'standard' | 'join_requests'>;
+  subjectMode?: DatasetSubjectMode;
+}
+
+export interface UpdateDatasetRequest {
+  expectedRevision: number;
+  name?: string;
+  slug?: string;
+  description?: string | null;
+}
+
+export interface ArchiveDatasetRequest {
+  expectedRevision: number;
+}
+
+export interface CreateDatasetFieldRequest {
+  expectedDatasetRevision: number;
+  key: string;
+  name: string;
+  description?: string | null;
+  kind: DatasetFieldKind;
+  valueSchema: JsonSchema;
+  config?: JsonObject;
+  required?: boolean;
+  relationTargetDatasetId?: string | null;
+  relationCardinality?: RelationCardinality | null;
+  position?: number;
+}
+
+/** Form 编辑器兼容接口内创建 Dataset 字段的请求。 */
+export interface CreateDatasetPanelFieldRequest {
+  datasetId: string;
+  key: string;
+  name: string;
+  description?: string;
+  kind: DatasetFieldKind;
+  valueSchema: JsonSchema;
+  config: JsonObject;
+  required: boolean;
+  relationTargetDatasetId?: string;
+  relationCardinality?: RelationCardinality;
+  position?: number;
+}
+
+export interface UpdateDatasetFieldRequest {
+  expectedDatasetRevision: number;
+  expectedFieldRevision: number;
+  name?: string;
+  description?: string | null;
+  valueSchema?: JsonSchema;
+  config?: JsonObject;
+  required?: boolean;
+  relationTargetDatasetId?: string | null;
+  relationCardinality?: RelationCardinality | null;
+  position?: number;
+}
+
+export interface ArchiveDatasetFieldRequest {
+  expectedDatasetRevision: number;
+  expectedFieldRevision: number;
+}
+
+export interface CreateDatasetRowRequest {
+  values?: Record<string, JsonValue>;
+  relations?: Record<string, string | string[]>;
+}
+
+export interface UpdateDatasetRowRequest {
+  expectedRevision: number;
+  values?: Record<string, JsonValue>;
+  relations?: Record<string, string | string[]>;
+}
+
+export interface DeleteDatasetRowRequest {
+  expectedRevision: number;
+}
+
+export interface DatasetMutationResponse {
+  dataset: DatasetSummary;
+}
+
+export interface DatasetFieldMutationResponse {
+  field: DatasetFieldDefinition;
+  datasetRevision: number;
 }
 
 /** 行版本摘要（不含完整快照内容）。 */

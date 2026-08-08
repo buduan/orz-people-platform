@@ -10,7 +10,24 @@ import {
   Prisma,
 } from '@prisma/client';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type {
+  AuthenticatedActor,
+  DatasetFieldDefinition,
+  DatasetRelationOptionPage,
+  DatasetRowData,
+  DatasetTableQuery,
+  DatasetWindowQueryRequest,
+  DatasetWindowQueryResponse,
+} from '@orz-people-platform/types';
+import {
+  applyDatasetQuery,
+  createDatasetGroupDirectory,
+  getDatasetAggregateOperations,
+  getDatasetFilterOperators,
+  getDatasetQueryFingerprint,
+  isDatasetFieldGroupable,
+  isDatasetQueryEmpty,
+} from '@orz-people-platform/utils';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -64,6 +81,151 @@ export class DatasetRowsService {
     };
   }
 
+  /** 查询绝对行窗口；空查询走数据库分页，复杂查询在明确的 5,000 行上限内复用共享语义。 */
+  public async queryWindow(
+    workspaceId: number,
+    datasetId: string,
+    request: DatasetWindowQueryRequest,
+    actor: AuthenticatedActor,
+  ): Promise<DatasetWindowQueryResponse> {
+    const detail = await this.datasets.get(workspaceId, datasetId, actor);
+    this.assertCompatibleQuery(detail.fields, request.query);
+    const fingerprint = getDatasetQueryFingerprint({
+      workspaceId,
+      datasetId,
+      definitionRevision: detail.dataset.revision,
+    }, request.query);
+
+    if (isDatasetQueryEmpty(request.query)) {
+      const [totalRowCount, rows] = await Promise.all([
+        this.prisma.datasetRow.count({
+          where: { workspaceId, datasetId, deletedAt: null },
+        }),
+        this.prisma.datasetRow.findMany({
+          where: { workspaceId, datasetId, deletedAt: null },
+          include: { sourceRelations: { orderBy: [{ fieldId: 'asc' }, { position: 'asc' }] } },
+          orderBy: { id: 'asc' },
+          skip: request.window.offset,
+          take: request.window.limit,
+        }),
+      ]);
+      return {
+        queryFingerprint: fingerprint,
+        totalRowCount,
+        startIndex: Math.min(request.window.offset, totalRowCount),
+        items: rows.map((row) => this.materialize(row)),
+        ...(request.includeGroupDirectory ? { groups: undefined } : {}),
+      };
+    }
+
+    const activeRowCount = await this.prisma.datasetRow.count({
+      where: { workspaceId, datasetId, deletedAt: null },
+    });
+    if (activeRowCount > 5_000) {
+      throw new BadRequestException('Complex Dataset queries support at most 5,000 active rows');
+    }
+    const rows = await this.prisma.datasetRow.findMany({
+      where: { workspaceId, datasetId, deletedAt: null },
+      include: { sourceRelations: { orderBy: [{ fieldId: 'asc' }, { position: 'asc' }] } },
+      orderBy: { id: 'asc' },
+    });
+    const queriedRows = applyDatasetQuery(
+      rows.map((row) => this.materialize(row)),
+      detail.fields,
+      request.query,
+    );
+    const startIndex = Math.min(request.window.offset, queriedRows.length);
+    return {
+      queryFingerprint: fingerprint,
+      totalRowCount: queriedRows.length,
+      startIndex,
+      items: queriedRows.slice(startIndex, startIndex + request.window.limit),
+      ...(request.includeGroupDirectory
+        ? { groups: createDatasetGroupDirectory(queriedRows, detail.fields, request.query) }
+        : {}),
+    };
+  }
+
+  /** 查询关联字段的目标行选项，同时保留已选中但不在当前分页中的值。 */
+  public async relationOptions(
+    workspaceId: number,
+    datasetId: string,
+    fieldId: string,
+    actor: AuthenticatedActor,
+    options: { cursor?: string; limit: number; search?: string; selectedIds: string[] },
+  ): Promise<DatasetRelationOptionPage> {
+    const source = await this.datasets.get(workspaceId, datasetId, actor);
+    const field = source.fields.find((item) => item.id === fieldId);
+    if (!field || field.kind !== 'relation' || !field.relationTargetDatasetId) {
+      throw new NotFoundException('Relation field not found');
+    }
+    const target = await this.datasets.get(
+      workspaceId,
+      field.relationTargetDatasetId,
+      actor,
+    );
+    const configuredLabelFieldId = typeof field.config.labelFieldId === 'string'
+      ? field.config.labelFieldId
+      : null;
+    const labelField = target.fields.find((item) => (
+      item.id === configuredLabelFieldId && item.kind !== 'relation'
+    ));
+    const baseWhere: Prisma.DatasetRowWhereInput = {
+      workspaceId,
+      datasetId: target.dataset.id,
+      deletedAt: null,
+    };
+    const search = options.search?.trim();
+    const where: Prisma.DatasetRowWhereInput = search
+      ? {
+        ...baseWhere,
+        OR: [
+          { id: { contains: search, mode: 'insensitive' } },
+          ...(labelField ? [{
+            values: {
+              path: [labelField.id],
+              string_contains: search,
+              mode: 'insensitive' as const,
+            },
+          }] : []),
+        ],
+      }
+      : baseWhere;
+    const [pageRowsWithExtra, selectedRows] = await Promise.all([
+      this.prisma.datasetRow.findMany({
+        where,
+        select: { id: true, values: true },
+        orderBy: { id: 'asc' },
+        take: options.limit + 1,
+        ...(options.cursor && { cursor: { id: options.cursor }, skip: 1 }),
+      }),
+      options.selectedIds.length > 0
+        ? this.prisma.datasetRow.findMany({
+          where: { ...baseWhere, id: { in: options.selectedIds } },
+          select: { id: true, values: true },
+          orderBy: { id: 'asc' },
+        })
+        : Promise.resolve([]),
+    ]);
+    const hasMore = pageRowsWithExtra.length > options.limit;
+    const pageRows = hasMore
+      ? pageRowsWithExtra.slice(0, options.limit)
+      : pageRowsWithExtra;
+    const optionRows = [...pageRows, ...selectedRows].map((row) => {
+      const values = row.values as Prisma.JsonObject;
+      const labelValue = labelField ? values[labelField.id] : undefined;
+      return {
+        label: typeof labelValue === 'string' && labelValue.trim() ? labelValue : row.id,
+        value: row.id,
+      };
+    });
+    const items = [...new Map(optionRows.map((item) => [item.value, item])).values()];
+    return {
+      items,
+      nextCursor: hasMore ? pageRows.at(-1)?.id ?? null : null,
+    };
+  }
+
   /** 获取单行，含合并后的关联关系。 */
   public async get(
     workspaceId: number,
@@ -90,8 +252,7 @@ export class DatasetRowsService {
     dto: DatasetRowValuesInput,
     actor: AuthenticatedActor,
   ) {
-    const dataset = await this.datasets.assertCanManage(workspaceId, datasetId, actor);
-    this.assertActive(dataset.status);
+    await this.datasets.assertCanCreateRows(workspaceId, datasetId, actor);
     const fields = await this.prisma.datasetField.findMany({ where: { datasetId } });
     const validated = this.schemas.validateRow(fields, dto);
     await this.validateRelationTargets(workspaceId, fields, validated);
@@ -146,8 +307,7 @@ export class DatasetRowsService {
     dto: UpdateDatasetRowInput,
     actor: AuthenticatedActor,
   ) {
-    const dataset = await this.datasets.assertCanManage(workspaceId, datasetId, actor);
-    this.assertActive(dataset.status);
+    await this.datasets.assertCanUpdateRows(workspaceId, datasetId, actor);
     const [row, fields] = await Promise.all([
       this.prisma.datasetRow.findUnique({
         where: { workspaceId_datasetId_id: { workspaceId, datasetId, id: rowId } },
@@ -226,8 +386,7 @@ export class DatasetRowsService {
     expectedRevision: number,
     actor: AuthenticatedActor,
   ) {
-    const dataset = await this.datasets.assertCanManage(workspaceId, datasetId, actor);
-    this.assertActive(dataset.status);
+    await this.datasets.assertCanDeleteRows(workspaceId, datasetId, actor);
     const row = await this.prisma.datasetRow.findUnique({
       where: { workspaceId_datasetId_id: { workspaceId, datasetId, id: rowId } },
       include: { sourceRelations: true },
@@ -366,6 +525,35 @@ export class DatasetRowsService {
     });
   }
 
+  private assertCompatibleQuery(
+    fields: DatasetFieldDefinition[],
+    query: DatasetTableQuery,
+  ): void {
+    const fieldsById = new Map(fields.map((field) => [field.id, field]));
+    query.filters.forEach((rule) => {
+      const field = fieldsById.get(rule.fieldId);
+      const compatible = field && getDatasetFilterOperators(field)
+        .some((option) => option.value === rule.operator);
+      if (!compatible) throw new BadRequestException(`Incompatible filter field: ${rule.fieldId}`);
+    });
+    query.sorts.forEach((rule) => {
+      if (!fieldsById.has(rule.fieldId)) {
+        throw new BadRequestException(`Unknown sort field: ${rule.fieldId}`);
+      }
+    });
+    if (!query.group) return;
+    const groupField = fieldsById.get(query.group.fieldId);
+    if (!groupField || !isDatasetFieldGroupable(groupField)) {
+      throw new BadRequestException(`Incompatible group field: ${query.group.fieldId}`);
+    }
+    query.group.aggregates.forEach((rule) => {
+      const field = fieldsById.get(rule.fieldId);
+      if (!field || !getDatasetAggregateOperations(field).includes(rule.operation)) {
+        throw new BadRequestException(`Incompatible aggregate field: ${rule.fieldId}`);
+      }
+    });
+  }
+
   /**
    * 批量验证关联目标：每个关联值指向的行必须存在且属于该字段声明的目标 Dataset。
    */
@@ -473,20 +661,20 @@ export class DatasetRowsService {
     sourceRelations: Array<{ fieldId: string; position: number; targetRowId: string }>;
     updatedAt: Date;
     values: Prisma.JsonValue;
-  }) {
+  }): DatasetRowData {
     const grouped = this.mergeRelations(row.sourceRelations, new Map());
     return {
       id: row.id,
       datasetId: row.datasetId,
-      values: row.values,
+      values: row.values as DatasetRowData['values'],
       relations: Object.fromEntries([...grouped.entries()].map(([fieldId, targets]) => [
         fieldId,
         targets.length === 1 ? targets[0] : targets,
       ])),
       revision: row.revision,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      deletedAt: row.deletedAt,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      deletedAt: row.deletedAt?.toISOString() ?? null,
     };
   }
 

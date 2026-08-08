@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable vue/valid-v-for -- Choice keys use immutable const values */
 import type {
-  CreateDatasetFieldRequest,
+  CreateDatasetPanelFieldRequest,
   DatasetFieldKind,
   DatasetPanelDetail,
   JsonSchemaObject,
@@ -37,7 +37,7 @@ const emit = defineEmits<{
   'update:datasetFieldId': [value: string];
   'update:choiceTitle': [index: number, value: string];
   addLocale: [locale: string];
-  createField: [request: CreateDatasetFieldRequest];
+  createField: [request: CreateDatasetPanelFieldRequest];
 }>();
 
 const localeDraft = shallowRef('');

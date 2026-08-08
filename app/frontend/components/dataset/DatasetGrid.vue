@@ -34,6 +34,8 @@ import type {
   DatasetMetadataState,
   DatasetMutationState,
   DatasetOption,
+  DatasetRelationOptionState,
+  DatasetRelationOptionsRequest,
   DatasetRowAction,
   DatasetRowActionPayload,
   DatasetRowRange,
@@ -63,8 +65,11 @@ const props = withDefaults(defineProps<{
   selection?: DatasetSelection;
   locks?: DatasetCellLockState[];
   relationOptions?: Record<string, DatasetOption[]>;
+  relationOptionStates?: Record<string, DatasetRelationOptionState>;
   rowActions?: DatasetRowAction[];
   readonlyCellKeys?: string[];
+  readonlyFieldIds?: string[];
+  canManageFields?: boolean;
   readonly?: boolean;
 }>(), {
   collapsedGroupIds: () => [],
@@ -74,8 +79,11 @@ const props = withDefaults(defineProps<{
   selection: () => ({ mode: 'explicit', rowIds: [] }),
   locks: () => [],
   relationOptions: () => ({}),
+  relationOptionStates: () => ({}),
   rowActions: () => [],
   readonlyCellKeys: () => [],
+  readonlyFieldIds: () => [],
+  canManageFields: false,
   readonly: false,
 });
 
@@ -92,6 +100,7 @@ const emit = defineEmits<{
   toggleGroup: [payload: DatasetToggleGroupPayload];
   windowRangeRequest: [ranges: DatasetRowRange[]];
   visibleRangeChange: [range: DatasetVisibleRange];
+  relationOptionsRequest: [request: DatasetRelationOptionsRequest];
 }>();
 
 const viewport = useTemplateRef<HTMLDivElement>('viewport');
@@ -133,6 +142,7 @@ const excludedSet = computed(() => new Set(
 const isCurrentAllMatching = computed(() => props.selection.mode === 'all_matching'
   && props.selection.queryFingerprint === props.queryFingerprint);
 const readonlySet = computed(() => new Set(props.readonlyCellKeys));
+const readonlyFieldSet = computed(() => new Set(props.readonlyFieldIds));
 const locksByCell = computed(() => new Map(props.locks.map((lock) => [
   getDatasetCellKey(lock.rowId, lock.fieldId),
   lock,
@@ -389,9 +399,13 @@ function fieldMenuItems(field: DatasetFieldDefinition): Array<Record<string, unk
     onSelect: () => emit('fieldAction', { fieldId: field.id, action }),
   });
   return [
-    item('修改字段', 'i-solar-pen-new-square-bold-duotone', 'modify'),
-    item('插入字段', 'i-solar-add-square-bold-duotone', 'insert'),
-    item('删除字段', 'i-solar-trash-bin-minimalistic-2-bold-duotone', 'delete', 'error'),
+    ...(props.canManageFields ? [
+      item('修改字段', 'i-solar-pen-new-square-bold-duotone', 'modify'),
+      item('插入字段', 'i-solar-add-square-bold-duotone', 'insert'),
+      ...(field.isSystemManaged
+        ? []
+        : [item('删除字段', 'i-solar-trash-bin-minimalistic-2-bold-duotone', 'delete', 'error')]),
+    ] : []),
     item('筛选', 'i-solar-filter-bold-duotone', 'filter'),
     item('分组', 'i-solar-layers-bold-duotone', 'group'),
     item('排序', 'i-solar-round-sort-vertical-bold-duotone', 'sort'),
@@ -401,11 +415,16 @@ function fieldMenuItems(field: DatasetFieldDefinition): Array<Record<string, unk
 function isCellReadonly(rowId: string, field: DatasetFieldDefinition): boolean {
   return props.readonly
     || field.isSystemManaged
+    || readonlyFieldSet.value.has(field.id)
     || readonlySet.value.has(getDatasetCellKey(rowId, field.id))
     || getMutation(rowId, field.id)?.status === 'pending';
 }
 
 function requestCellEdit(rowId: string, field: DatasetFieldDefinition): void {
+  if (field.kind === 'relation'
+    && props.relationOptionStates[field.id]?.status === 'error') {
+    emit('relationOptionsRequest', { fieldId: field.id });
+  }
   if (isCellReadonly(rowId, field)) return;
   const lock = getLock(rowId, field.id);
   if (lock?.status === 'remote') return;
@@ -698,9 +717,14 @@ function retryMetadata(): void {
               :field="field"
               :value="getDatasetCellValue(entry.row, field)"
               :relation-options="relationOptions"
+              :relation-option-state="relationOptionStates[field.id]"
               @draft-change="updateDraft"
               @commit="commitCell(entry.row, field.id, $event)"
               @release="releaseCell({ rowId: entry.row.id, fieldId: field.id })"
+              @relation-options-request="emit('relationOptionsRequest', {
+                fieldId: field.id,
+                ...$event,
+              })"
             />
 
             <button

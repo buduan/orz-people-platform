@@ -16,17 +16,20 @@
 - Form 公开填写 API：按全局 `Form.id` 读取最小 published 定义和安全 relation 选项，支持匿名/
   登录可选认证、主体行预填、隐藏字段拒绝、Redis 限频、幂等提交和最小成功响应。
 
-## 已实现但暂未暴露 HTTP API 的领域能力
+## 已实现的 Dataset HTTP 能力
 
-`SpecialDatasetsModule` 当前只注册领域服务。Dataset 与 Form 已暴露面板和公开填写所需的有限
-GET/POST action API；其余完整管理能力仍仅供后端内部模块调用。
+`DatasetsModule` 已注册受保护的 Workspace REST API，支持可见数据表列表、安全详情投影、能力矩阵、标准/加入申请数据表创建、元数据与归档、字段定义、绝对行窗口、行变更和关联选项查询；同时保留 Form 编辑器使用的 Dataset 列表、详情和字段创建兼容接口。
 
 - Dataset：`standard`、`members`、`join_requests` 和 `activity_registrations` 类型，字段定义、JSON Schema 值校验、行数据、关系字段、协作者和归档。
 - 历史与并发：Dataset 定义快照、Dataset 行版本、软删除/恢复和基于 `revision` 的乐观并发控制。
+- 查询：空查询使用数据库绝对窗口；筛选、排序与分组复用前后端共享语义，复杂查询上限为 5,000 条活跃行。
+- 权限：列表可见性和详情/变更均在 Service 层校验；特殊 Dataset 与归档 Dataset 返回服务端计算的只读能力。
+
+## 已实现但暂未暴露 HTTP API 的领域能力
+
+`SpecialDatasetsModule` 的其余管理能力当前仍仅供后端内部模块调用。
+
 - 特殊数据：成员资料同步、游客加入申请及批准/拒绝、活动及活动报名绑定。
-- Form：JSON Schema（AJV Draft 2020-12 方言，不要求 `$schema`）、受控 `x-form` 扩展、多语言文案、`availableIf`、关联字段筛选、草稿/发布版本和匿名/登录提交策略。详见 [form-schema.md](./form-schema.md)。
-- Form 提交领域服务：`create_row`、`update_subject_row`、AJV 校验、设备信息采集、规范化 JSON
-  checksum、关系/特殊 Dataset 校验和事务性写入；公开入口已由 `FormSubmissionsController` 暴露。
 
 ## 当前前端能力
 
@@ -34,6 +37,8 @@ GET/POST action API；其余完整管理能力仍仅供后端内部模块调用�
 - 登录、注册、邮箱验证、密码登录、邮箱验证码登录、Passkey 登录、MFA 和密码重置流程。
 - 认证状态、Access/Refresh Token Cookie 持久化、API 响应解包、统一错误处理和安全重定向。
 - 响应式 Dashboard 布局预览：桌面侧栏折叠、移动端 Slideover、Workspace 切换器和用户面板。
+- `/panel/dataset` 数据表列表：加载、错误重试、空状态、创建、打开和乐观锁归档。
+- `/panel/dataset/:id` 数据表编辑器：Header + 高密度数据表、绝对窗口、筛选/排序/分组、字段与行变更、关系选项和能力驱动只读状态。
 - `/panel/form` 表单管理：主列表/归档列表、创建、编辑、归档和恢复；提交记录入口暂为占位。
 - `/panel/form/:id` JSON Schema 编辑器：基于现有三栏组件的 Palette、画布、表单/字段设置，
   支持默认语言优先的多语言编辑、Dataset 字段绑定/创建、Header 保存/发布及编辑锁状态。

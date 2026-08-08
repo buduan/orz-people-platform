@@ -1,8 +1,9 @@
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   DatasetCollaboratorRole,
   DatasetFieldKind,
   DatasetStatus,
+  DatasetType,
   MemberStatus,
 } from '@prisma/client';
 import {
@@ -34,6 +35,122 @@ function createService(prisma: object): DatasetsService {
 }
 
 describe('Dataset mutation invariants', () => {
+  it('projects visible Dataset list rows without account-sensitive creator data', async () => {
+    const createdAt = new Date('2026-08-08T00:00:00.000Z');
+    const prisma = {
+      dataset: {
+        findMany: vi.fn().mockResolvedValue([{
+          id: 'dataset-1',
+          workspaceId: 1,
+          name: 'People',
+          slug: 'people',
+          description: null,
+          type: DatasetType.standard,
+          status: DatasetStatus.active,
+          subjectMode: 'none',
+          revision: 1,
+          createdAt,
+          updatedAt: createdAt,
+          createdBy: {
+            id: 'creator-1',
+            name: 'Creator',
+            nickname: null,
+            username: 'creator',
+            avatarUrl: null,
+            email: 'must-not-leak@example.com',
+          },
+          collaborators: [{
+            workspaceMemberId: 'member-1',
+            role: DatasetCollaboratorRole.owner,
+          }],
+        }]),
+      },
+      workspaceMember: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'member-1' }),
+      },
+    };
+
+    const response = await createService(prisma).list(1, actor);
+
+    expect(response).toMatchObject({
+      canCreate: true,
+      items: [{
+        id: 'dataset-1',
+        creator: { id: 'creator-1', displayName: 'Creator', avatarUrl: null },
+      }],
+    });
+    expect(response.items[0]?.creator).not.toHaveProperty('email');
+    expect(prisma.dataset.findMany.mock.calls[0]?.[0]?.select).not.toHaveProperty('fields');
+  });
+
+  it('projects detail with active ordered fields and a safe creator', async () => {
+    const timestamp = new Date('2026-08-08T00:00:00.000Z');
+    const dataset = {
+      id: 'dataset-1',
+      workspaceId: 1,
+      name: 'People',
+      slug: 'people',
+      description: null,
+      type: DatasetType.standard,
+      status: DatasetStatus.active,
+      subjectMode: 'none',
+      revision: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      createdBy: {
+        id: 'creator-1',
+        name: 'Creator',
+        nickname: null,
+        username: 'creator',
+        avatarUrl: null,
+        email: 'must-not-leak@example.com',
+      },
+      collaborators: [],
+      fields: [{
+        id: 'field-1',
+        datasetId: 'dataset-1',
+        key: 'name',
+        name: 'Name',
+        description: null,
+        kind: DatasetFieldKind.text,
+        valueSchema: { type: 'string' },
+        config: {},
+        required: true,
+        isSystemManaged: false,
+        systemKey: null,
+        relationTargetDatasetId: null,
+        relationCardinality: null,
+        position: 0,
+        revision: 1,
+        archivedAt: null,
+      }],
+    };
+    const prisma = {
+      dataset: {
+        findUnique: vi.fn().mockResolvedValue(dataset),
+        findUniqueOrThrow: vi.fn().mockResolvedValue(dataset),
+      },
+      workspaceMember: { findUnique: vi.fn().mockResolvedValue({ id: 'member-1' }) },
+    };
+
+    const response = await createService(prisma).get(1, 'dataset-1', actor);
+
+    expect(response.creator).toEqual({
+      id: 'creator-1',
+      displayName: 'Creator',
+      avatarUrl: null,
+    });
+    expect(response.fields).toHaveLength(1);
+    expect(prisma.dataset.findUniqueOrThrow).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        fields: expect.objectContaining({
+          where: { archivedAt: null },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        }),
+      }),
+    }));
+  });
+
   it('protects the final owner of an active Dataset', async () => {
     const tx = {
       dataset: { findUniqueOrThrow: vi.fn().mockResolvedValue({ status: DatasetStatus.active }) },
@@ -45,7 +162,14 @@ describe('Dataset mutation invariants', () => {
     };
     const prisma = {
       $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
-      dataset: { findUnique: vi.fn().mockResolvedValue({ id: 'dataset-1', workspaceId: 1 }) },
+      dataset: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'dataset-1',
+          workspaceId: 1,
+          type: DatasetType.standard,
+          status: DatasetStatus.active,
+        }),
+      },
     };
 
     await expect(createService(prisma).removeCollaborator(
@@ -83,7 +207,14 @@ describe('Dataset mutation invariants', () => {
     };
     const prisma = {
       $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
-      dataset: { findUnique: vi.fn().mockResolvedValue({ id: 'dataset-1', workspaceId: 1 }) },
+      dataset: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'dataset-1',
+          workspaceId: 1,
+          type: DatasetType.standard,
+          status: DatasetStatus.active,
+        }),
+      },
     };
 
     await expect(createService(prisma).update(1, 'dataset-1', {
@@ -92,31 +223,78 @@ describe('Dataset mutation invariants', () => {
     }, actor)).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('rejects field creation by a non-manager', async () => {
-    const restrictedActor: AuthenticatedActor = {
-      ...actor,
-      isWorkspaceAdmin: false,
-      permissions: [],
+  it('normalizes inserted field positions and records one transactional audit', async () => {
+    const timestamp = new Date('2026-08-08T00:00:00.000Z');
+    const createdField = {
+      id: 'field-new',
+      workspaceId: 1,
+      datasetId: 'dataset-1',
+      key: 'new',
+      name: 'New',
+      description: null,
+      kind: 'text',
+      valueSchema: { type: 'string' },
+      config: {},
+      required: false,
+      isSystemManaged: false,
+      systemKey: null,
+      relationTargetDatasetId: null,
+      relationCardinality: null,
+      position: 1,
+      revision: 1,
+      archivedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const tx = {
+      dataset: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      datasetField: {
+        findMany: vi.fn().mockResolvedValue([{ id: 'field-a' }, { id: 'field-b' }]),
+        create: vi.fn().mockResolvedValue(createdField),
+        update: vi.fn().mockResolvedValue(undefined),
+      },
     };
     const prisma = {
       dataset: {
         findUnique: vi.fn().mockResolvedValue({
           id: 'dataset-1',
           workspaceId: 1,
+          type: DatasetType.standard,
           status: DatasetStatus.active,
         }),
       },
-      workspaceMember: { findUnique: vi.fn().mockResolvedValue({ id: 'member-1' }) },
-      datasetCollaborator: { findUnique: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
+    const audit = { record: vi.fn().mockResolvedValue(undefined) };
+    const service = new DatasetsService(
+      prisma as never,
+      audit as never,
+      { assertFieldSchema: vi.fn().mockReturnValue({ type: 'string' }) } as never,
+    );
+    vi.spyOn(service, 'createDefinitionVersion').mockResolvedValue(undefined);
 
-    await expect(createService(prisma).createField(1, 'dataset-1', {
-      key: 'nickname',
-      name: 'Nickname',
+    await expect(service.createField(1, 'dataset-1', {
+      expectedDatasetRevision: 3,
+      key: 'new',
+      name: 'New',
+      description: null,
       kind: DatasetFieldKind.text,
       valueSchema: { type: 'string' },
       config: {},
       required: false,
-    }, restrictedActor)).rejects.toBeInstanceOf(ForbiddenException);
+      relationTargetDatasetId: null,
+      relationCardinality: null,
+      position: 1,
+    }, actor)).resolves.toMatchObject({ datasetRevision: 4 });
+    expect(tx.datasetField.update.mock.calls.map(([input]) => input)).toEqual([
+      { where: { id: 'field-a' }, data: { position: 0 } },
+      { where: { id: 'field-new' }, data: { position: 1 } },
+      { where: { id: 'field-b' }, data: { position: 2 } },
+    ]);
+    expect(audit.record).toHaveBeenCalledOnce();
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'dataset.field.create',
+      metadata: { datasetId: 'dataset-1', kind: DatasetFieldKind.text },
+    }), tx);
   });
 });

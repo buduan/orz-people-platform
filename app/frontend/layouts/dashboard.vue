@@ -37,6 +37,11 @@ const navigation: NavigationMenuItem[] = [
     to: '/organization',
   },
   {
+    label: '数据表',
+    icon: 'i-solar-database-bold-duotone',
+    to: '/panel/dataset',
+  },
+  {
     label: 'Forms',
     icon: 'i-solar-notes-bold-duotone',
     to: '/panel/form',

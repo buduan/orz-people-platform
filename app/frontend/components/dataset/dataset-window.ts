@@ -1,12 +1,12 @@
-import type { DatasetRowRange } from './types';
+import type {
+  DatasetRowRange,
+  DatasetRowData,
+  DatasetWindowQueryScope,
+} from '@orz-people-platform/types';
+
+export type { DatasetWindowQueryScope } from '@orz-people-platform/types';
 
 export const DATASET_WINDOW_SIZE = 50;
-
-export interface DatasetWindowQueryScope {
-  workspaceId: number | string;
-  datasetId: string;
-  definitionRevision: number;
-}
 
 export function getDatasetWindowOffsets(
   ranges: readonly DatasetRowRange[],
@@ -46,4 +46,12 @@ export function getDatasetWindowQueryKey(
     offset,
     DATASET_WINDOW_SIZE,
   ] as const;
+}
+
+export function replaceLoadedDatasetRow(
+  rowSlots: Readonly<Record<number, DatasetRowData | undefined>>,
+  row: DatasetRowData,
+): Record<number, DatasetRowData | undefined> | null {
+  const entry = Object.entries(rowSlots).find(([, loadedRow]) => loadedRow?.id === row.id);
+  return entry ? { ...rowSlots, [Number(entry[0])]: row } : null;
 }

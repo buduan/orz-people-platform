@@ -11,6 +11,7 @@ tags:
   - name: Authentication
   - name: Users
   - name: Form filling
+  - name: Datasets
 paths:
   /health:
     get:
@@ -436,6 +437,241 @@ paths:
           description: Closed state, stale revision, or conflicting idempotency payload.
         '429':
           description: The per-Form actor/network submission limit was exceeded.
+  /workspaces/{workspaceId}/datasets:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Datasets]
+      operationId: listDatasets
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Visible Datasets and creation capability.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetListEnvelope' }
+    post:
+      tags: [Datasets]
+      operationId: createDataset
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDatasetRequest' }
+      responses:
+        '201':
+          description: Dataset created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+    get:
+      tags: [Datasets]
+      operationId: getDataset
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Dataset detail, active fields, creator and capabilities.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetDetailEnvelope' }
+    patch:
+      tags: [Datasets]
+      operationId: updateDataset
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateDatasetRequest' }
+      responses:
+        '200':
+          description: Dataset updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      tags: [Datasets]
+      operationId: archiveDataset
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionRequest' }
+      responses:
+        '201':
+          description: Dataset archived.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}/fields:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      tags: [Datasets]
+      operationId: createDatasetField
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDatasetFieldRequest' }
+      responses:
+        '201':
+          description: Field created and positioned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetFieldMutationEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}/fields/{fieldId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+      - $ref: '#/components/parameters/FieldId'
+    patch:
+      tags: [Datasets]
+      operationId: updateDatasetField
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateDatasetFieldRequest' }
+      responses:
+        '200':
+          description: Field updated and positions normalized.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetFieldMutationEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}/fields/{fieldId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+      - $ref: '#/components/parameters/FieldId'
+    post:
+      tags: [Datasets]
+      operationId: archiveDatasetField
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArchiveDatasetFieldRequest' }
+      responses:
+        '201':
+          description: Field archived and positions normalized.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetFieldMutationEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}/fields/{fieldId}/options:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+      - $ref: '#/components/parameters/FieldId'
+      - name: search
+        in: query
+        schema: { type: string, maxLength: 128 }
+      - name: cursor
+        in: query
+        schema: { type: string }
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      - name: selectedIds
+        in: query
+        schema: { type: array, maxItems: 100, items: { type: string } }
+    get:
+      tags: [Datasets]
+      operationId: listDatasetRelationOptions
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Paged relation options with selected values retained.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetRelationOptionEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}/rows/query:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      tags: [Datasets]
+      operationId: queryDatasetRows
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DatasetWindowQueryRequest' }
+      responses:
+        '201':
+          description: Absolute Dataset row window.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetWindowEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}/rows:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      tags: [Datasets]
+      operationId: createDatasetRow
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDatasetRowRequest' }
+      responses:
+        '201':
+          description: Materialized Dataset row.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetRowEnvelope' }
+  /workspaces/{workspaceId}/datasets/{datasetId}/rows/{rowId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DatasetId'
+      - name: rowId
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Datasets]
+      operationId: updateDatasetRow
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateDatasetRowRequest' }
+      responses:
+        '200':
+          description: Materialized updated Dataset row.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DatasetRowEnvelope' }
+    delete:
+      tags: [Datasets]
+      operationId: deleteDatasetRow
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionRequest' }
+      responses:
+        '200':
+          $ref: '#/components/responses/Accepted'
 components:
   securitySchemes:
     bearerAuth:
@@ -455,6 +691,22 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/CreatedAcceptedEnvelope'
+  parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    DatasetId:
+      name: datasetId
+      in: path
+      required: true
+      schema: { type: string }
+    FieldId:
+      name: fieldId
+      in: path
+      required: true
+      schema: { type: string }
   schemas:
     EnvelopeBase:
       type: object
@@ -979,3 +1231,295 @@ components:
                 status:
                   type: string
                   enum: [pending, active, disabled]
+    DatasetSummary:
+      type: object
+      additionalProperties: false
+      required: [id, workspaceId, name, slug, description, type, status, subjectMode, revision, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        workspaceId: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: [string, 'null'] }
+        type: { type: string, enum: [standard, members, join_requests, activity_registrations] }
+        status: { type: string, enum: [active, archived] }
+        subjectMode: { type: string, enum: [none, single_per_user] }
+        revision: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DatasetCreator:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, avatarUrl]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        avatarUrl: { type: [string, 'null'] }
+    DatasetCapabilities:
+      type: object
+      additionalProperties: false
+      required: [canUpdateMetadata, canArchive, canManageFields, canCreateRows, canUpdateRows, canDeleteRows]
+      properties:
+        canUpdateMetadata: { type: boolean }
+        canArchive: { type: boolean }
+        canManageFields: { type: boolean }
+        canCreateRows: { type: boolean }
+        canUpdateRows: { type: boolean }
+        canDeleteRows: { type: boolean }
+    DatasetField:
+      type: object
+      additionalProperties: false
+      required: [id, datasetId, key, name, description, kind, valueSchema, config, required, isSystemManaged, systemKey, relationTargetDatasetId, relationCardinality, position, revision, archivedAt]
+      properties:
+        id: { type: string }
+        datasetId: { type: string }
+        key: { type: string }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        kind: { type: string, enum: [text, long_text, number, boolean, date, time, datetime, email, url, single_select, multi_select, json, relation] }
+        valueSchema: {}
+        config: { type: object, additionalProperties: true }
+        required: { type: boolean }
+        isSystemManaged: { type: boolean }
+        systemKey: { type: [string, 'null'] }
+        relationTargetDatasetId: { type: [string, 'null'] }
+        relationCardinality: { type: [string, 'null'], enum: [one, many, null] }
+        position: { type: integer, minimum: 0 }
+        revision: { type: integer, minimum: 1 }
+        archivedAt: { type: [string, 'null'], format: date-time }
+    DatasetRow:
+      type: object
+      additionalProperties: false
+      required: [id, datasetId, values, relations, revision, createdAt, updatedAt, deletedAt]
+      properties:
+        id: { type: string }
+        datasetId: { type: string }
+        values: { type: object, additionalProperties: true }
+        relations:
+          type: object
+          additionalProperties:
+            oneOf:
+              - { type: string }
+              - { type: array, items: { type: string } }
+        revision: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+    DatasetDetail:
+      type: object
+      required: [dataset, fields, creator, capabilities]
+      properties:
+        dataset: { $ref: '#/components/schemas/DatasetSummary' }
+        fields: { type: array, items: { $ref: '#/components/schemas/DatasetField' } }
+        creator: { $ref: '#/components/schemas/DatasetCreator' }
+        capabilities: { $ref: '#/components/schemas/DatasetCapabilities' }
+    DatasetList:
+      type: object
+      required: [items, canCreate]
+      properties:
+        canCreate: { type: boolean }
+        items:
+          type: array
+          items:
+            allOf:
+              - { $ref: '#/components/schemas/DatasetSummary' }
+              - type: object
+                required: [creator, capabilities]
+                properties:
+                  creator: { $ref: '#/components/schemas/DatasetCreator' }
+                  capabilities: { $ref: '#/components/schemas/DatasetCapabilities' }
+    CreateDatasetRequest:
+      type: object
+      additionalProperties: false
+      required: [name, slug, type]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 128 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 64 }
+        description: { type: string, maxLength: 2000 }
+        type: { type: string, enum: [standard, join_requests] }
+        subjectMode: { type: string, enum: [none, single_per_user], default: none }
+    RevisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+    UpdateDatasetRequest:
+      allOf:
+        - { $ref: '#/components/schemas/RevisionRequest' }
+        - type: object
+          properties:
+            name: { type: string, minLength: 1, maxLength: 128 }
+            slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 64 }
+            description: { type: [string, 'null'], maxLength: 2000 }
+    CreateDatasetFieldRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedDatasetRevision, key, name, kind, valueSchema]
+      properties:
+        expectedDatasetRevision: { type: integer, minimum: 1 }
+        key: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 128 }
+        description: { type: [string, 'null'] }
+        kind: { $ref: '#/components/schemas/DatasetField/properties/kind' }
+        valueSchema: {}
+        config: { type: object, additionalProperties: true }
+        required: { type: boolean }
+        relationTargetDatasetId: { type: string }
+        relationCardinality: { type: string, enum: [one, many] }
+        position: { type: integer, minimum: 0 }
+    UpdateDatasetFieldRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedDatasetRevision, expectedFieldRevision]
+      properties:
+        expectedDatasetRevision: { type: integer, minimum: 1 }
+        expectedFieldRevision: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 128 }
+        description: { type: [string, 'null'] }
+        valueSchema: {}
+        config: { type: object, additionalProperties: true }
+        required: { type: boolean }
+        position: { type: integer, minimum: 0 }
+    ArchiveDatasetFieldRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedDatasetRevision, expectedFieldRevision]
+      properties:
+        expectedDatasetRevision: { type: integer, minimum: 1 }
+        expectedFieldRevision: { type: integer, minimum: 1 }
+    DatasetTableQuery:
+      type: object
+      additionalProperties: false
+      required: [filters, sorts, group]
+      properties:
+        filters:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, fieldId, operator]
+            properties:
+              id: { type: string }
+              fieldId: { type: string }
+              operator: { type: string, enum: [contains, equals, not_equals, gt, gte, lt, lte, is_empty, is_not_empty, contains_any, contains_all, not_contains] }
+              value: {}
+        sorts:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, fieldId, direction]
+            properties:
+              id: { type: string }
+              fieldId: { type: string }
+              direction: { type: string, enum: [asc, desc] }
+        group:
+          oneOf:
+            - { type: 'null' }
+            - type: object
+              additionalProperties: false
+              required: [fieldId, aggregates]
+              properties:
+                fieldId: { type: string }
+                aggregates:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [id, fieldId, operation]
+                    properties:
+                      id: { type: string }
+                      fieldId: { type: string }
+                      operation: { type: string, enum: [sum, avg, min, max, count_non_empty] }
+    DatasetWindowQueryRequest:
+      type: object
+      additionalProperties: false
+      required: [query, window]
+      properties:
+        query: { $ref: '#/components/schemas/DatasetTableQuery' }
+        window:
+          type: object
+          additionalProperties: false
+          required: [offset, limit]
+          properties:
+            offset: { type: integer, minimum: 0 }
+            limit: { type: integer, minimum: 1, maximum: 100 }
+        includeGroupDirectory: { type: boolean }
+    CreateDatasetRowRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        values: { type: object, additionalProperties: true }
+        relations: { type: object, additionalProperties: true }
+    UpdateDatasetRowRequest:
+      allOf:
+        - { $ref: '#/components/schemas/RevisionRequest' }
+        - { $ref: '#/components/schemas/CreateDatasetRowRequest' }
+    DatasetEnvelope:
+      allOf:
+        - { $ref: '#/components/schemas/EnvelopeBase' }
+        - type: object
+          properties: { data: { $ref: '#/components/schemas/DatasetSummary' } }
+    DatasetListEnvelope:
+      allOf:
+        - { $ref: '#/components/schemas/EnvelopeBase' }
+        - type: object
+          properties: { data: { $ref: '#/components/schemas/DatasetList' } }
+    DatasetDetailEnvelope:
+      allOf:
+        - { $ref: '#/components/schemas/EnvelopeBase' }
+        - type: object
+          properties: { data: { $ref: '#/components/schemas/DatasetDetail' } }
+    DatasetFieldMutationEnvelope:
+      allOf:
+        - { $ref: '#/components/schemas/EnvelopeBase' }
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [field, datasetRevision]
+              properties:
+                field: { $ref: '#/components/schemas/DatasetField' }
+                datasetRevision: { type: integer, minimum: 1 }
+    DatasetRowEnvelope:
+      allOf:
+        - { $ref: '#/components/schemas/EnvelopeBase' }
+        - type: object
+          properties: { data: { $ref: '#/components/schemas/DatasetRow' } }
+    DatasetWindowEnvelope:
+      allOf:
+        - { $ref: '#/components/schemas/EnvelopeBase' }
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [queryFingerprint, totalRowCount, startIndex, items]
+              properties:
+                queryFingerprint: { type: string }
+                totalRowCount: { type: integer, minimum: 0 }
+                startIndex: { type: integer, minimum: 0 }
+                items: { type: array, items: { $ref: '#/components/schemas/DatasetRow' } }
+                groups: { type: array, items: { type: object, additionalProperties: true } }
+    DatasetRelationOptionEnvelope:
+      allOf:
+        - { $ref: '#/components/schemas/EnvelopeBase' }
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [items, nextCursor]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [label, value]
+                    properties:
+                      label: { type: string }
+                      value: { type: string }
+                nextCursor: { type: [string, 'null'] }
