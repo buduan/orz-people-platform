@@ -1,6 +1,13 @@
 <script setup lang="ts">
 /* eslint-disable vue/valid-v-for -- FormField keys use schema item ids */
-import { computed, provide, watch } from '#imports';
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  provide,
+  useTemplateRef,
+  watch,
+} from '#imports';
 import type { FormItemId, JsonSchema, JsonValue } from '@orz-people-platform/types';
 import { createInitialFormState, getSchemaProperties } from '@orz-people-platform/utils';
 import { useFormFieldEditingState } from '~/composables/useFormFieldEditing';
@@ -21,6 +28,7 @@ const state = defineModel<Record<FormItemId, JsonValue | undefined>>({
 const selectedFieldId = defineModel<string | null>('selectedFieldId', {
   default: null,
 });
+const formRoot = useTemplateRef<{ $el: HTMLElement }>('formRoot');
 
 const emit = defineEmits<{
   up: [fieldId: string];
@@ -77,6 +85,20 @@ function onBlankClick(): void {
   if (props.mode === 'edit') clearEditing();
 }
 
+function onDocumentClick(event: MouseEvent): void {
+  const form = formRoot.value?.$el;
+  if (
+    props.mode !== 'edit'
+    || !form
+    || !(event.target instanceof Node)
+    || form.contains(event.target)
+  ) return;
+  clearEditing();
+}
+
+onMounted(() => document.addEventListener('click', onDocumentClick, true));
+onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick, true));
+
 function onSubmit(): void {
   emit('submit', state.value);
 }
@@ -84,6 +106,7 @@ function onSubmit(): void {
 
 <template>
   <UForm
+    ref="formRoot"
     :state="state"
     class="space-y-4"
     @submit="onSubmit"

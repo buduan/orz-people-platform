@@ -68,9 +68,7 @@ const requiredIds = computed(() => (
 const property = computed(() => properties.value?.[props.fieldId]);
 const itemExtension = computed(() => getItemExtension(property.value));
 
-const visible = computed(() =>
-  isItemVisible(itemExtension.value, state.value ?? {}),
-);
+const visible = computed(() => isItemVisible(itemExtension.value, state.value ?? {}));
 
 const resolvedTitle = computed(() => {
   if (props.title !== undefined) return props.title;
@@ -100,6 +98,7 @@ const leafProps = computed(() => {
   const base: Record<string, unknown> = {
     placeholder: placeholder.value,
     required: fieldRequired.value,
+    disabled: props.allowEdit,
   };
   if (widgetName.value === 'input') {
     base.type = resolveInputType(property.value);
@@ -123,9 +122,9 @@ const leafProps = computed(() => {
 });
 
 const modelValue = computed<JsonValue | undefined>({
-  get: () => state.value?.[props.fieldId],
+  get: () => (props.allowEdit ? undefined : state.value?.[props.fieldId]),
   set: (value) => {
-    if (!state.value) return;
+    if (props.allowEdit || !state.value) return;
     state.value[props.fieldId] = value;
   },
 });
@@ -209,10 +208,7 @@ function emitDelete(): void { emit('delete', props.fieldId); }
     @click="enterEdit"
   >
     <div class="p-4">
-      <div
-        class="flex items-start gap-2"
-        @click.stop
-      >
+      <div class="flex items-start gap-2">
         <h3
           v-if="!titleEditing"
           class="text-lg font-bold text-highlighted"
@@ -238,7 +234,7 @@ function emitDelete(): void { emit('delete', props.fieldId); }
 
         <UButton
           v-if="editing && !titleEditing"
-          icon="i-solar-pen-new-round-bold-duotone"
+          icon="solar:pen-2-line-duotone"
           color="neutral"
           variant="ghost"
           size="xs"
@@ -253,7 +249,6 @@ function emitDelete(): void { emit('delete', props.fieldId); }
       <div
         v-if="showDescriptionRow"
         class="mt-1 flex items-start gap-2"
-        @click.stop
       >
         <p
           v-if="!descriptionEditing"
@@ -275,7 +270,7 @@ function emitDelete(): void { emit('delete', props.fieldId); }
 
         <UButton
           v-if="editing && !descriptionEditing"
-          icon="i-solar-pen-new-round-bold-duotone"
+          icon="solar:pen-2-line-duotone"
           color="neutral"
           variant="ghost"
           size="xs"
@@ -288,10 +283,7 @@ function emitDelete(): void { emit('delete', props.fieldId); }
       </div>
 
       <!-- 叶子 item：UFormField + componentMap -->
-      <div
-        class="mt-3"
-        @click.stop
-      >
+      <div class="mt-3">
         <UFormField
           :name="fieldName"
           :required="fieldRequired"
