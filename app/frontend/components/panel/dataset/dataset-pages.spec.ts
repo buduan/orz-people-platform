@@ -43,11 +43,18 @@ describe('Dataset dashboard pages', () => {
     expect(list).not.toContain('rounded-lg border border-default bg-default');
   });
 
-  it('keeps row and field dialogs accessible and revision submission in the adapter', () => {
-    const rowDialog = source('./RowDialog.vue');
+  it('replaces the row dialog with a typed inline draft while retaining field dialog revisions', () => {
+    const editor = source('./Editor.vue');
+    const grid = source('../../dataset/DatasetGrid.vue');
+    const newRow = source('../../dataset/DatasetNewRow.vue');
     const fieldDialog = source('./FieldDialog.vue');
     const adapter = source('../../../composables/useDatasetEditor.ts');
-    expect(rowDialog).toContain('id="dataset-row-form"');
+    expect(editor).not.toContain('PanelDatasetRowDialog');
+    expect(editor).toContain('@row-create-request="createRow"');
+    expect(grid).toContain('<DatasetNewRow');
+    expect(grid).toContain('count: displayItems.value.length');
+    expect(newRow).toContain('parseDatasetFieldInputValue');
+    expect(newRow).toContain("if (valid) emit('submit', { values, relations })");
     expect(fieldDialog).toContain('id="dataset-field-form"');
     expect(fieldDialog).toContain(':disabled="editing"');
     expect(adapter).toContain('expectedDatasetRevision');

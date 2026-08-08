@@ -1,4 +1,5 @@
 import type {
+  CreateDatasetRowRequest,
   DatasetGroupSummary,
   DatasetOption,
   DatasetQueryKind,
@@ -154,11 +155,16 @@ export interface DatasetTableProps {
   readonlyFieldIds?: string[];
   canManageFields?: boolean;
   canCreateRows?: boolean;
+  rowCreateActive?: boolean;
+  rowCreatePending?: boolean;
+  rowCreateError?: string | null;
   readonly?: boolean;
 }
 
 export interface DatasetTableEmits {
-  'row-create-request': [];
+  'row-create-open-request': [];
+  'row-create-cancel-request': [];
+  'row-create-request': [input: CreateDatasetRowRequest];
   'query-change': [query: DatasetTableQuery];
   'selection-change': [selection: DatasetSelection];
   'field-action': [payload: DatasetFieldActionPayload];

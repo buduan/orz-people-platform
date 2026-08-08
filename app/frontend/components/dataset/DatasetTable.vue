@@ -28,6 +28,9 @@ withDefaults(defineProps<DatasetTableProps>(), {
   readonlyFieldIds: () => [],
   canManageFields: false,
   canCreateRows: true,
+  rowCreateActive: false,
+  rowCreatePending: false,
+  rowCreateError: null,
   readonly: false,
 });
 
@@ -76,8 +79,9 @@ function emitCellCommit(payload: DatasetCellCoordinates & {
       :relation-option-states="relationOptionStates"
       :readonly="readonly"
       :can-create-rows="canCreateRows"
+      :row-create-active="rowCreateActive"
       :open-request="queryOpenRequest"
-      @create-row="emit('row-create-request')"
+      @create-row="emit('row-create-open-request')"
       @update-query="emit('query-change', $event)"
       @relation-options-request="emit('relation-options-request', $event)"
     />
@@ -100,7 +104,12 @@ function emitCellCommit(payload: DatasetCellCoordinates & {
       :readonly-cell-keys="readonlyCellKeys"
       :readonly-field-ids="readonlyFieldIds"
       :can-manage-fields="canManageFields"
+      :row-create-active="rowCreateActive"
+      :row-create-pending="rowCreatePending"
+      :row-create-error="rowCreateError"
       :readonly="readonly"
+      @row-create-request="emit('row-create-request', $event)"
+      @row-create-cancel-request="emit('row-create-cancel-request')"
       @selection-change="emit('selection-change', $event)"
       @field-action="handleFieldAction"
       @row-action="emit('row-action', $event)"

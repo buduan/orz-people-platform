@@ -1,6 +1,10 @@
 <script setup lang="ts">
 /* eslint-disable vue/valid-v-for -- vue-eslint-parser misses these scoped aliases. */
-import type { DatasetFieldDefinition, JsonValue } from '@orz-people-platform/types';
+import type {
+  CreateDatasetRowRequest,
+  DatasetFieldDefinition,
+  JsonValue,
+} from '@orz-people-platform/types';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import type { VirtualItem } from '@tanstack/vue-virtual';
 import { useEventListener } from '@vueuse/core';
@@ -12,6 +16,7 @@ import {
   watch,
 } from '#imports';
 import DatasetCellEditor from './DatasetCellEditor.vue';
+import DatasetNewRow from './DatasetNewRow.vue';
 import { getDatasetCellFinalizeActions } from './dataset-cell';
 import {
   buildDatasetDisplayItems,
@@ -70,6 +75,9 @@ const props = withDefaults(defineProps<{
   readonlyCellKeys?: string[];
   readonlyFieldIds?: string[];
   canManageFields?: boolean;
+  rowCreateActive?: boolean;
+  rowCreatePending?: boolean;
+  rowCreateError?: string | null;
   readonly?: boolean;
 }>(), {
   collapsedGroupIds: () => [],
@@ -84,6 +92,9 @@ const props = withDefaults(defineProps<{
   readonlyCellKeys: () => [],
   readonlyFieldIds: () => [],
   canManageFields: false,
+  rowCreateActive: false,
+  rowCreatePending: false,
+  rowCreateError: null,
   readonly: false,
 });
 
@@ -101,6 +112,8 @@ const emit = defineEmits<{
   windowRangeRequest: [ranges: DatasetRowRange[]];
   visibleRangeChange: [range: DatasetVisibleRange];
   relationOptionsRequest: [request: DatasetRelationOptionsRequest];
+  rowCreateRequest: [input: CreateDatasetRowRequest];
+  rowCreateCancelRequest: [];
 }>();
 
 const viewport = useTemplateRef<HTMLDivElement>('viewport');
@@ -158,6 +171,7 @@ const headerSelectionState = computed<boolean | 'indeterminate'>(() => {
   if (selectedSet.value.size === 0) return false;
   return selectedSet.value.size === props.totalRowCount ? true : 'indeterminate';
 });
+const hasActionColumn = computed(() => props.rowActions.length > 0 || props.rowCreateActive);
 
 function getFieldWidth(field: DatasetFieldDefinition): number {
   const configuredWidth = field.config.width;
@@ -173,11 +187,11 @@ const fieldWidths = computed(() => props.fields.map((field) => getFieldWidth(fie
 const gridTemplateColumns = computed(() => [
   `${INDEX_COLUMN_WIDTH}px`,
   ...fieldWidths.value.map((width) => `${width}px`),
-  ...(props.rowActions.length > 0 ? [`${ACTION_COLUMN_WIDTH}px`] : []),
+  ...(hasActionColumn.value ? [`${ACTION_COLUMN_WIDTH}px`] : []),
 ].join(' '));
 const gridMinWidth = computed(() => INDEX_COLUMN_WIDTH
   + fieldWidths.value.reduce((total, width) => total + width, 0)
-  + (props.rowActions.length > 0 ? ACTION_COLUMN_WIDTH : 0));
+  + (hasActionColumn.value ? ACTION_COLUMN_WIDTH : 0));
 
 const rowVirtualizer = useVirtualizer(computed(() => ({
   count: displayItems.value.length,
@@ -319,6 +333,12 @@ watch(() => props.queryFingerprint, async (_fingerprint, previousFingerprint) =>
   if (activeCell.value) finalizeCellLeavingViewport(activeCell.value);
   await nextTick();
   if (viewport.value) viewport.value.scrollTop = 0;
+});
+
+watch(() => props.rowCreateActive, async (active, previousActive) => {
+  if (!active || previousActive) return;
+  await nextTick();
+  if (viewport.value) viewport.value.scrollTop = viewport.value.scrollHeight;
 });
 
 watch(() => props.collapsedGroupIds, async (nextIds, previousIds) => {
@@ -548,7 +568,7 @@ function retryMetadata(): void {
     ref="viewport"
     role="grid"
     :aria-rowcount="displayItems.length + 1"
-    :aria-colcount="fields.length + 1 + (rowActions.length > 0 ? 1 : 0)"
+    :aria-colcount="fields.length + 1 + (hasActionColumn ? 1 : 0)"
     class="relative min-h-0 flex-1 overflow-auto bg-white"
   >
     <div
@@ -604,7 +624,7 @@ function retryMetadata(): void {
       </div>
 
       <div
-        v-if="rowActions.length > 0"
+        v-if="hasActionColumn"
         role="columnheader"
         class="flex items-center border-b border-slate-200 px-3"
       >
@@ -612,232 +632,233 @@ function retryMetadata(): void {
       </div>
     </div>
 
-    <div
-      v-if="displayItems.length > 0"
-      class="relative"
-      :style="{ height: `${totalHeight}px`, minWidth: `${gridMinWidth}px` }"
-    >
+    <template v-if="displayItems.length > 0">
       <div
-        v-for="entry in virtualEntries"
-        :key="entry.item.key"
-        role="row"
-        :aria-rowindex="entry.virtualRow.index + 2"
-        class="absolute left-0 top-0 grid w-full text-sm text-slate-700"
-        :class="entry.item.kind === 'group' ? 'h-14' : 'group/row h-11'"
-        :style="{
-          height: `${entry.item.kind === 'group'
-            ? DATASET_GROUP_HEADER_HEIGHT
-            : DATASET_ROW_HEIGHT}px`,
-          transform: `translateY(${entry.virtualRow.start}px)`,
-          gridTemplateColumns,
-        }"
+        class="relative"
+        :style="{ height: `${totalHeight}px`, minWidth: `${gridMinWidth}px` }"
       >
         <div
-          v-if="entry.item.kind === 'group' && entry.group"
-          role="gridcell"
-          :class="[
-            'flex h-14 min-w-0 items-center gap-3 overflow-hidden border-b border-primary-100',
-            'bg-primary-50 px-3 text-primary-950',
-          ]"
-          :style="{ gridColumn: '1 / -1' }"
+          v-for="entry in virtualEntries"
+          :key="entry.item.key"
+          role="row"
+          :aria-rowindex="entry.virtualRow.index + 2"
+          class="absolute left-0 top-0 grid w-full text-sm text-slate-700"
+          :class="entry.item.kind === 'group' ? 'h-14' : 'group/row h-11'"
+          :style="{
+            height: `${entry.item.kind === 'group'
+              ? DATASET_GROUP_HEADER_HEIGHT
+              : DATASET_ROW_HEIGHT}px`,
+            transform: `translateY(${entry.virtualRow.start}px)`,
+            gridTemplateColumns,
+          }"
         >
-          <button
-            type="button"
-            :class="[
-              'flex size-8 shrink-0 items-center justify-center rounded-md',
-              'hover:bg-primary-100 focus-visible:outline-2 focus-visible:outline-primary-500',
-            ]"
-            :aria-expanded="!collapsedSet.has(entry.group.groupId)"
-            :aria-label="`${collapsedSet.has(entry.group.groupId)
-              ? '展开'
-              : '折叠'}分组 ${formatGroupKey(entry.group)}`"
-            @click="toggleGroup(entry.group, entry.virtualRow.index)"
-          >
-            <UIcon
-              :name="collapsedSet.has(entry.group.groupId)
-                ? 'i-solar-alt-arrow-right-bold-duotone'
-                : 'i-solar-alt-arrow-down-bold-duotone'"
-              class="size-4"
-            />
-          </button>
-          <span
-            class="min-w-0 truncate font-medium"
-            :title="formatGroupKey(entry.group)"
-          >{{ formatGroupKey(entry.group) }}</span>
-          <span class="shrink-0 text-xs text-primary-700">
-            {{ entry.group.rowCount.toLocaleString('zh-CN') }} 行
-          </span>
-          <span
-            v-for="label in aggregateLabels(entry.group)"
-            :key="label"
-            class="min-w-0 truncate rounded bg-white/70 px-2 py-1 text-xs text-slate-600"
-            :title="label"
-          >{{ label }}</span>
-        </div>
-
-        <template v-else-if="entry.item.kind === 'row' && entry.row">
           <div
+            v-if="entry.item.kind === 'group' && entry.group"
             role="gridcell"
             :class="[
-              'sticky left-0 z-10 flex h-11 items-center justify-center bg-white',
-              'border-b border-r border-slate-100',
+              'flex h-14 min-w-0 items-center gap-3 overflow-hidden border-b border-primary-100',
+              'bg-primary-50 px-3 text-primary-950',
             ]"
+            :style="{ gridColumn: '1 / -1' }"
           >
-            <span
-              :class="[
-                'tabular-nums text-xs text-slate-400 group-hover/row:hidden',
-                'group-focus-within/row:hidden',
-                isRowSelected(entry.row.id) && 'hidden',
-              ]"
-            >
-              {{ entry.item.rowIndex + 1 }}
-            </span>
-            <UCheckbox
-              :model-value="isRowSelected(entry.row.id)"
-              :aria-label="`选择第 ${entry.item.rowIndex + 1} 行`"
-              :class="[
-                'absolute opacity-0 transition-opacity group-hover/row:opacity-100',
-                'focus-within:opacity-100',
-                isRowSelected(entry.row.id) && 'opacity-100',
-              ]"
-              @update:model-value="toggleRow(entry.row.id, $event)"
-            />
-          </div>
-
-          <div
-            v-for="field in fields"
-            :key="field.id"
-            role="gridcell"
-            class="h-11 min-w-0 overflow-hidden border-b border-r border-slate-100"
-          >
-            <DatasetCellEditor
-              v-if="isActiveCell(entry.row.id, field.id)"
-              :key="getDatasetCellKey(entry.row.id, field.id)"
-              :row-id="entry.row.id"
-              :field="field"
-              :value="getDatasetCellValue(entry.row, field)"
-              :relation-options="relationOptions"
-              :relation-option-state="relationOptionStates[field.id]"
-              @draft-change="updateDraft"
-              @commit="commitCell(entry.row, field.id, $event)"
-              @release="releaseCell({ rowId: entry.row.id, fieldId: field.id })"
-              @relation-options-request="emit('relationOptionsRequest', {
-                fieldId: field.id,
-                ...$event,
-              })"
-            />
-
             <button
-              v-else
               type="button"
               :class="[
-                'flex h-11 w-full min-w-0 items-center gap-2 overflow-hidden',
-                'border border-transparent',
-                'px-3 text-left outline-none transition-colors hover:border-primary-200',
-                'focus-visible:border-primary-500',
-                getLock(entry.row.id, field.id)?.status === 'remote'
-                  && 'cursor-not-allowed bg-slate-100/70 text-slate-400',
-                isCellReadonly(entry.row.id, field) && 'cursor-default text-slate-500',
-                getMutation(entry.row.id, field.id)?.status === 'error'
-                  && 'border-error-300 bg-error-50',
-                getMutation(entry.row.id, field.id)?.status === 'conflict'
-                  && 'border-warning-300 bg-warning-50',
+                'flex size-8 shrink-0 items-center justify-center rounded-md',
+                'hover:bg-primary-100 focus-visible:outline-2 focus-visible:outline-primary-500',
               ]"
-              :aria-label="`编辑${field.name}`"
-              :aria-disabled="isCellReadonly(entry.row.id, field)
-                || getLock(entry.row.id, field.id)?.status === 'remote'"
-              :title="getMutation(entry.row.id, field.id)?.message
-                ?? (getLock(entry.row.id, field.id)?.status === 'remote'
-                  ? `${getLock(entry.row.id, field.id)?.ownerName ?? '其他用户'}正在编辑`
-                  : formatDatasetCellValue(getDatasetCellValue(entry.row, field)))"
-              @click="requestCellEdit(entry.row.id, field)"
+              :aria-expanded="!collapsedSet.has(entry.group.groupId)"
+              :aria-label="`${collapsedSet.has(entry.group.groupId)
+                ? '展开'
+                : '折叠'}分组 ${formatGroupKey(entry.group)}`"
+              @click="toggleGroup(entry.group, entry.virtualRow.index)"
             >
               <UIcon
-                v-if="getLock(entry.row.id, field.id)?.status === 'remote'"
-                name="i-solar-lock-keyhole-minimalistic-bold-duotone"
-                class="size-3.5 shrink-0"
+                :name="collapsedSet.has(entry.group.groupId)
+                  ? 'i-solar-alt-arrow-right-bold-duotone'
+                  : 'i-solar-alt-arrow-down-bold-duotone'"
+                class="size-4"
               />
-              <UIcon
-                v-else-if="getMutation(entry.row.id, field.id)?.status === 'pending'"
-                name="i-solar-refresh-circle-bold-duotone"
-                class="size-3.5 shrink-0 animate-spin"
-              />
-              <span class="block min-w-0 flex-1 truncate">
-                {{ formatDatasetCellValue(getDatasetCellValue(entry.row, field)) || '—' }}
-              </span>
             </button>
-          </div>
-
-          <div
-            v-if="rowActions.length > 0"
-            role="gridcell"
-            :class="[
-              'flex h-11 items-center gap-1 overflow-hidden px-2',
-              'border-b border-slate-100',
-            ]"
-          >
-            <UButton
-              v-for="action in rowActions"
-              :key="action.id"
-              :icon="action.icon"
-              :label="action.label"
-              color="secondary"
-              variant="soft"
-              size="xs"
-              :disabled="action.disabled"
-              @click="emitRowAction(entry.row, action.id)"
-            />
-          </div>
-        </template>
-
-        <template v-else-if="entry.item.kind === 'row'">
-          <div
-            role="gridcell"
-            :class="[
-              'sticky left-0 z-10 flex h-11 items-center justify-center bg-white',
-              'border-b border-r border-slate-100 text-xs tabular-nums text-slate-300',
-            ]"
-          >
-            {{ entry.item.rowIndex + 1 }}
-          </div>
-          <div
-            v-if="getWindowState(entry.item.rowIndex)?.status === 'error'"
-            role="gridcell"
-            :class="[
-              'flex h-11 items-center gap-2 overflow-hidden bg-error-50 px-3',
-              'border-b border-slate-100 text-xs text-error-700',
-            ]"
-            :style="{ gridColumn: '2 / -1' }"
-          >
-            <span class="min-w-0 flex-1 truncate">
-              {{ getWindowState(entry.item.rowIndex)?.error ?? '窗口加载失败' }}
+            <span
+              class="min-w-0 truncate font-medium"
+              :title="formatGroupKey(entry.group)"
+            >{{ formatGroupKey(entry.group) }}</span>
+            <span class="shrink-0 text-xs text-primary-700">
+              {{ entry.group.rowCount.toLocaleString('zh-CN') }} 行
             </span>
-            <UButton
-              label="重试"
-              color="error"
-              variant="ghost"
-              size="xs"
-              @click="retryWindow(entry.item.rowIndex)"
-            />
+            <span
+              v-for="label in aggregateLabels(entry.group)"
+              :key="label"
+              class="min-w-0 truncate rounded bg-white/70 px-2 py-1 text-xs text-slate-600"
+              :title="label"
+            >{{ label }}</span>
           </div>
-          <template v-else>
+
+          <template v-else-if="entry.item.kind === 'row' && entry.row">
+            <div
+              role="gridcell"
+              :class="[
+                'sticky left-0 z-10 flex h-11 items-center justify-center bg-white',
+                'border-b border-r border-slate-100',
+              ]"
+            >
+              <span
+                :class="[
+                  'tabular-nums text-xs text-slate-400 group-hover/row:hidden',
+                  'group-focus-within/row:hidden',
+                  isRowSelected(entry.row.id) && 'hidden',
+                ]"
+              >
+                {{ entry.item.rowIndex + 1 }}
+              </span>
+              <UCheckbox
+                :model-value="isRowSelected(entry.row.id)"
+                :aria-label="`选择第 ${entry.item.rowIndex + 1} 行`"
+                :class="[
+                  'absolute opacity-0 transition-opacity group-hover/row:opacity-100',
+                  'focus-within:opacity-100',
+                  isRowSelected(entry.row.id) && 'opacity-100',
+                ]"
+                @update:model-value="toggleRow(entry.row.id, $event)"
+              />
+            </div>
+
             <div
               v-for="field in fields"
               :key="field.id"
               role="gridcell"
-              class="flex h-11 items-center border-b border-r border-slate-100 px-3"
+              class="h-11 min-w-0 overflow-hidden border-b border-r border-slate-100"
             >
-              <div class="h-2 w-full max-w-24 animate-pulse rounded bg-slate-100" />
+              <DatasetCellEditor
+                v-if="isActiveCell(entry.row.id, field.id)"
+                :key="getDatasetCellKey(entry.row.id, field.id)"
+                :row-id="entry.row.id"
+                :field="field"
+                :value="getDatasetCellValue(entry.row, field)"
+                :relation-options="relationOptions"
+                :relation-option-state="relationOptionStates[field.id]"
+                @draft-change="updateDraft"
+                @commit="commitCell(entry.row, field.id, $event)"
+                @release="releaseCell({ rowId: entry.row.id, fieldId: field.id })"
+                @relation-options-request="emit('relationOptionsRequest', {
+                  fieldId: field.id,
+                  ...$event,
+                })"
+              />
+
+              <button
+                v-else
+                type="button"
+                :class="[
+                  'flex h-11 w-full min-w-0 items-center gap-2 overflow-hidden',
+                  'border border-transparent',
+                  'px-3 text-left outline-none transition-colors hover:border-primary-200',
+                  'focus-visible:border-primary-500',
+                  getLock(entry.row.id, field.id)?.status === 'remote'
+                    && 'cursor-not-allowed bg-slate-100/70 text-slate-400',
+                  isCellReadonly(entry.row.id, field) && 'cursor-default text-slate-500',
+                  getMutation(entry.row.id, field.id)?.status === 'error'
+                    && 'border-error-300 bg-error-50',
+                  getMutation(entry.row.id, field.id)?.status === 'conflict'
+                    && 'border-warning-300 bg-warning-50',
+                ]"
+                :aria-label="`编辑${field.name}`"
+                :aria-disabled="isCellReadonly(entry.row.id, field)
+                  || getLock(entry.row.id, field.id)?.status === 'remote'"
+                :title="getMutation(entry.row.id, field.id)?.message
+                  ?? (getLock(entry.row.id, field.id)?.status === 'remote'
+                    ? `${getLock(entry.row.id, field.id)?.ownerName ?? '其他用户'}正在编辑`
+                    : formatDatasetCellValue(getDatasetCellValue(entry.row, field)))"
+                @click="requestCellEdit(entry.row.id, field)"
+              >
+                <UIcon
+                  v-if="getLock(entry.row.id, field.id)?.status === 'remote'"
+                  name="i-solar-lock-keyhole-minimalistic-bold-duotone"
+                  class="size-3.5 shrink-0"
+                />
+                <UIcon
+                  v-else-if="getMutation(entry.row.id, field.id)?.status === 'pending'"
+                  name="i-solar-refresh-circle-bold-duotone"
+                  class="size-3.5 shrink-0 animate-spin"
+                />
+                <span class="block min-w-0 flex-1 truncate">
+                  {{ formatDatasetCellValue(getDatasetCellValue(entry.row, field)) || '—' }}
+                </span>
+              </button>
+            </div>
+
+            <div
+              v-if="hasActionColumn"
+              role="gridcell"
+              :class="[
+                'flex h-11 items-center gap-1 overflow-hidden px-2',
+                'border-b border-slate-100',
+              ]"
+            >
+              <UButton
+                v-for="action in rowActions"
+                :key="action.id"
+                :icon="action.icon"
+                :label="action.label"
+                color="secondary"
+                variant="soft"
+                size="xs"
+                :disabled="action.disabled"
+                @click="emitRowAction(entry.row, action.id)"
+              />
+            </div>
+          </template>
+
+          <template v-else-if="entry.item.kind === 'row'">
+            <div
+              role="gridcell"
+              :class="[
+                'sticky left-0 z-10 flex h-11 items-center justify-center bg-white',
+                'border-b border-r border-slate-100 text-xs tabular-nums text-slate-300',
+              ]"
+            >
+              {{ entry.item.rowIndex + 1 }}
             </div>
             <div
-              v-if="rowActions.length > 0"
+              v-if="getWindowState(entry.item.rowIndex)?.status === 'error'"
               role="gridcell"
-              class="h-11 border-b border-slate-100"
-            />
+              :class="[
+                'flex h-11 items-center gap-2 overflow-hidden bg-error-50 px-3',
+                'border-b border-slate-100 text-xs text-error-700',
+              ]"
+              :style="{ gridColumn: '2 / -1' }"
+            >
+              <span class="min-w-0 flex-1 truncate">
+                {{ getWindowState(entry.item.rowIndex)?.error ?? '窗口加载失败' }}
+              </span>
+              <UButton
+                label="重试"
+                color="error"
+                variant="ghost"
+                size="xs"
+                @click="retryWindow(entry.item.rowIndex)"
+              />
+            </div>
+            <template v-else>
+              <div
+                v-for="field in fields"
+                :key="field.id"
+                role="gridcell"
+                class="flex h-11 items-center border-b border-r border-slate-100 px-3"
+              >
+                <div class="h-2 w-full max-w-24 animate-pulse rounded bg-slate-100" />
+              </div>
+              <div
+                v-if="hasActionColumn"
+                role="gridcell"
+                class="h-11 border-b border-slate-100"
+              />
+            </template>
           </template>
-        </template>
+        </div>
       </div>
-    </div>
+    </template>
 
     <div
       v-else-if="metadataPending"
@@ -869,11 +890,25 @@ function retryMetadata(): void {
     </div>
 
     <div
-      v-else
+      v-else-if="!rowCreateActive"
       class="flex min-h-56 items-center justify-center text-sm text-slate-500"
       :style="{ minWidth: `${gridMinWidth}px` }"
     >
       暂无数据
     </div>
+
+    <DatasetNewRow
+      v-if="rowCreateActive"
+      :fields="fields"
+      :grid-template-columns="gridTemplateColumns"
+      :grid-min-width="gridMinWidth"
+      :relation-options="relationOptions"
+      :relation-option-states="relationOptionStates"
+      :pending="rowCreatePending"
+      :error="rowCreateError"
+      @cancel="emit('rowCreateCancelRequest')"
+      @relation-options-request="emit('relationOptionsRequest', { fieldId: $event })"
+      @submit="emit('rowCreateRequest', $event)"
+    />
   </div>
 </template>

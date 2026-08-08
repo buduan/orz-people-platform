@@ -1,4 +1,5 @@
 import { describe, expectTypeOf, it } from 'vitest';
+import type { CreateDatasetRowRequest } from '@orz-people-platform/types';
 import type {
   DatasetCellCommitPayload,
   DatasetGroupSummary,
@@ -24,6 +25,10 @@ describe('DatasetTable controlled contract', () => {
       .toEqualTypeOf<[ranges: DatasetRowRange[]]>();
     expectTypeOf<DatasetTableEmits['selection-change']>()
       .toEqualTypeOf<[selection: DatasetSelection]>();
+    expectTypeOf<DatasetTableEmits['row-create-request']>()
+      .toEqualTypeOf<[input: CreateDatasetRowRequest]>();
     expectTypeOf<DatasetCellCommitPayload['expectedRevision']>().toEqualTypeOf<number>();
+    expectTypeOf<DatasetTableProps['rowCreateActive']>().toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<DatasetTableProps['rowCreateError']>().toEqualTypeOf<string | null | undefined>();
   });
 });

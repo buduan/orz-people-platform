@@ -17,6 +17,7 @@ const props = defineProps<{
   relationOptionStates?: Record<string, DatasetRelationOptionState>;
   readonly?: boolean;
   canCreateRows?: boolean;
+  rowCreateActive?: boolean;
   openRequest?: DatasetQueryOpenRequest | null;
 }>();
 
@@ -46,7 +47,7 @@ const hasGroup = computed(() => props.query.group !== null);
       variant="ghost"
       size="sm"
       class="rounded-md text-slate-700 hover:bg-slate-200"
-      :disabled="readonly || canCreateRows === false"
+      :disabled="readonly || canCreateRows === false || rowCreateActive"
       @click="emit('createRow')"
     />
     <DatasetQueryPopover

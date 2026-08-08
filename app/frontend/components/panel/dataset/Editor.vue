@@ -27,7 +27,7 @@ type UpdateFieldInput = Omit<UpdateDatasetFieldRequest, 'expectedDatasetRevision
 const props = defineProps<{ datasetId: string }>();
 const router = useRouter();
 const editor = useDatasetEditor(props.datasetId);
-const rowDialogOpen = shallowRef(false);
+const rowCreateActive = shallowRef(false);
 const rowPending = shallowRef(false);
 const rowError = shallowRef<string | null>(null);
 const deleteRowTarget = shallowRef<DatasetRowData | null>(null);
@@ -49,9 +49,6 @@ const creatorName = computed(() => editor.detail.value?.creator.displayName ?? '
 const readonly = computed(() => isDatasetEditorReadonly(
   editor.dataset.value?.status,
   editor.capabilities.value,
-));
-const writableFields = computed(() => editor.fields.value.filter(
-  (field) => !field.isSystemManaged,
 ));
 const readonlyRelationFieldIds = computed(() => Object.entries(
   editor.relationOptionStates.value,
@@ -104,12 +101,23 @@ async function createRow(input: CreateDatasetRowRequest): Promise<void> {
   rowError.value = null;
   try {
     await editor.createRow(input);
-    rowDialogOpen.value = false;
+    rowCreateActive.value = false;
   } catch (cause) {
     rowError.value = apiMessage(cause);
   } finally {
     rowPending.value = false;
   }
+}
+
+function openRowCreate(): void {
+  rowError.value = null;
+  rowCreateActive.value = true;
+}
+
+function cancelRowCreate(): void {
+  if (rowPending.value) return;
+  rowError.value = null;
+  rowCreateActive.value = false;
 }
 
 async function deleteRow(): Promise<void> {
@@ -279,7 +287,12 @@ async function archiveDataset(): Promise<void> {
       :can-create-rows="editor.capabilities.value.canCreateRows"
       :can-manage-fields="editor.capabilities.value.canManageFields"
       :readonly-field-ids="readonlyRelationFieldIds"
-      @row-create-request="rowError = null; rowDialogOpen = true"
+      :row-create-active="rowCreateActive"
+      :row-create-pending="rowPending"
+      :row-create-error="rowError"
+      @row-create-open-request="openRowCreate"
+      @row-create-cancel-request="cancelRowCreate"
+      @row-create-request="createRow"
       @query-change="editor.updateQuery"
       @selection-change="editor.setSelection"
       @field-action="handleFieldAction"
@@ -305,15 +318,6 @@ async function archiveDataset(): Promise<void> {
       @update:open="actionError = null"
     />
 
-    <PanelDatasetRowDialog
-      v-model:open="rowDialogOpen"
-      :fields="writableFields"
-      :relation-options="editor.relationOptions.value"
-      :pending="rowPending"
-      :error="rowError"
-      @relation-options-request="editor.loadRelationOptions"
-      @submit="createRow"
-    />
     <PanelDatasetFieldDialog
       v-model:open="fieldDialogOpen"
       :field="fieldDialogTarget"
