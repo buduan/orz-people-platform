@@ -92,117 +92,111 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-    <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <PanelCommonNavigation class="mb-3" />
-        <h1 class="text-2xl font-semibold tracking-tight text-highlighted">
-          数据表
-        </h1>
-        <p class="mt-1 text-sm text-muted">
-          管理工作区中的结构化数据与字段定义。
-        </p>
-      </div>
-      <UButton
-        v-if="data.canCreate"
-        label="新建数据表"
-        icon="i-solar-add-circle-bold-duotone"
-        @click="createError = null; createOpen = true"
-      />
-    </div>
+  <div class="mx-auto w-full max-w-[90rem] px-4 py-6 sm:px-8 lg:px-12">
+    <PanelCommonNavigation />
 
-    <div class="overflow-hidden rounded-lg border border-default bg-default">
+    <main class="mt-8">
+      <header class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight text-highlighted">
+            数据表管理
+          </h1>
+          <p class="mt-1.5 text-sm text-muted">
+            管理工作区中的结构化数据与字段定义。
+          </p>
+        </div>
+        <UButton
+          v-if="data.canCreate"
+          label="新建数据表"
+          icon="i-solar-add-circle-bold-duotone"
+          color="neutral"
+          @click="createError = null; createOpen = true"
+        />
+      </header>
+
       <div
         v-if="state === 'loading'"
+        class="grid min-h-72 place-items-center"
         aria-label="正在加载数据表"
       >
-        <!-- eslint-disable-next-line vue/valid-v-for -->
-        <div
-          v-for="index in 5"
-          :key="index"
-          class="grid min-h-16 grid-cols-[minmax(0,1fr)_7rem] items-center gap-4 border-b
-            border-default px-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_8rem_8rem_3rem]"
-        >
-          <USkeleton class="h-4 w-2/3" />
-          <USkeleton class="h-4 w-16" />
-          <USkeleton class="hidden h-4 w-20 sm:block" />
-          <USkeleton class="hidden size-8 sm:block" />
-        </div>
+        <UIcon
+          name="i-solar-refresh-bold-duotone"
+          class="size-7 animate-spin text-primary"
+        />
       </div>
 
       <div
         v-else-if="state === 'error'"
-        class="flex min-h-64 flex-col items-center justify-center px-6 text-center"
+        class="grid min-h-72 place-items-center p-8 text-center"
         role="alert"
       >
-        <UIcon
-          name="i-solar-danger-triangle-bold-duotone"
-          class="mb-3 size-8 text-error"
-        />
-        <p class="font-medium text-highlighted">
-          数据表加载失败
-        </p>
-        <p class="mt-1 max-w-md text-sm text-muted">
-          {{ error }}
-        </p>
-        <UButton
-          label="重试"
-          icon="i-solar-refresh-bold-duotone"
-          color="neutral"
-          variant="outline"
-          class="mt-4"
-          @click="load"
-        />
+        <div>
+          <UIcon
+            name="i-solar-danger-triangle-bold-duotone"
+            class="size-8 text-error"
+          />
+          <p class="mt-3 text-sm text-muted">
+            {{ error }}
+          </p>
+          <UButton
+            class="mt-4"
+            label="重试"
+            color="neutral"
+            @click="load"
+          />
+        </div>
       </div>
 
       <div
         v-else-if="data.items.length === 0"
-        class="flex min-h-64 flex-col items-center justify-center px-6 text-center"
+        class="grid min-h-72 place-items-center p-8 text-center"
       >
-        <UIcon
-          name="i-solar-database-bold-duotone"
-          class="mb-3 size-9 text-dimmed"
-        />
-        <p class="font-medium text-highlighted">
-          还没有可见的数据表
-        </p>
-        <p class="mt-1 text-sm text-muted">
-          {{ data.canCreate ? '创建第一张数据表开始整理数据。' : '请联系管理员授予访问权限。' }}
-        </p>
+        <div>
+          <UIcon
+            name="i-solar-database-bold-duotone"
+            class="size-10 text-dimmed"
+          />
+          <h2 class="mt-3 font-medium text-highlighted">
+            还没有可见的数据表
+          </h2>
+          <p class="mt-1 text-sm text-muted">
+            {{ data.canCreate ? '创建第一张数据表开始整理数据。' : '请联系管理员授予访问权限。' }}
+          </p>
+        </div>
       </div>
 
       <div
         v-else
         class="overflow-x-auto"
       >
-        <table class="w-full min-w-[42rem] text-left text-sm">
-          <thead class="border-b border-default bg-elevated/60 text-xs text-muted">
+        <table class="w-full min-w-[52rem] text-left text-sm">
+          <thead class="border-b border-default text-xs font-medium text-dimmed">
             <tr>
-              <th class="px-4 py-3 font-medium">
+              <th class="px-3 py-3">
                 数据表
               </th>
-              <th class="px-4 py-3 font-medium">
+              <th class="px-3 py-3">
                 类型
               </th>
-              <th class="px-4 py-3 font-medium">
+              <th class="px-3 py-3">
                 状态
               </th>
-              <th class="px-4 py-3 font-medium">
+              <th class="px-3 py-3">
                 更新时间
               </th>
-              <th class="w-14 px-4 py-3">
-                <span class="sr-only">操作</span>
+              <th class="px-3 py-3 text-right">
+                操作
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-default">
+          <tbody class="divide-y divide-default/70">
             <!-- eslint-disable-next-line vue/valid-v-for -->
             <tr
               v-for="dataset in data.items"
               :key="dataset.id"
-              class="group hover:bg-elevated/40"
+              class="group transition-colors hover:bg-elevated/40"
             >
-              <td class="px-4 py-3.5">
+              <td class="px-3 py-4">
                 <NuxtLink
                   :to="getDatasetEditorPath(dataset.id)"
                   class="block min-w-0 rounded-sm focus-visible:outline-2
@@ -218,20 +212,20 @@ onMounted(load);
                   </span>
                 </NuxtLink>
               </td>
-              <td class="px-4 py-3.5 text-toned">
+              <td class="px-3 py-4 text-toned">
                 {{ typeLabel(dataset.type) }}
               </td>
-              <td class="px-4 py-3.5">
+              <td class="px-3 py-4">
                 <UBadge
                   :label="dataset.status === 'active' ? '使用中' : '已归档'"
                   :color="dataset.status === 'active' ? 'success' : 'neutral'"
                   variant="subtle"
                 />
               </td>
-              <td class="px-4 py-3.5 text-muted">
+              <td class="px-3 py-4 text-muted">
                 {{ formatDate(dataset.updatedAt) }}
               </td>
-              <td class="px-4 py-3.5 text-right">
+              <td class="px-3 py-4 text-right">
                 <UDropdownMenu
                   :items="[[
                     {
@@ -260,7 +254,7 @@ onMounted(load);
           </tbody>
         </table>
       </div>
-    </div>
+    </main>
 
     <PanelDatasetDefinitionDialog
       v-model:open="createOpen"
@@ -309,5 +303,5 @@ onMounted(load);
         </div>
       </template>
     </UModal>
-  </section>
+  </div>
 </template>

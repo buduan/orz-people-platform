@@ -35,6 +35,14 @@ describe('Dataset dashboard pages', () => {
     expect(list).toContain('getDatasetEditorPath(dataset.id)');
   });
 
+  it('aligns the list layout with the Notion-style form index', () => {
+    const list = source('./List.vue');
+    expect(list).toContain('max-w-[90rem]');
+    expect(list).toContain('<PanelCommonNavigation />');
+    expect(list).toContain('divide-y divide-default/70');
+    expect(list).not.toContain('rounded-lg border border-default bg-default');
+  });
+
   it('keeps row and field dialogs accessible and revision submission in the adapter', () => {
     const rowDialog = source('./RowDialog.vue');
     const fieldDialog = source('./FieldDialog.vue');
