@@ -29,15 +29,15 @@ export class RelationValidationService {
     const rows = ids.length === 0
       ? []
       : await this.prisma.datasetRow.findMany({
-          where: { id: { in: ids }, workspaceId, deletedAt: null },
-          select: { id: true, datasetId: true },
-        });
+        where: { id: { in: ids }, workspaceId, deletedAt: null },
+        select: { id: true, datasetId: true },
+      });
     const datasetByRow = new Map(rows.map((row) => [row.id, row.datasetId]));
     const fieldsById = new Map(fields.map((f) => [f.id, f]));
-    for (const [fieldId, targetIds] of relations) {
+    relations.forEach((targetIds, fieldId) => {
       const expected = fieldsById.get(fieldId)?.relationTargetDatasetId;
       const invalid = targetIds.find((id) => datasetByRow.get(id) !== expected);
       if (invalid) throw new BadRequestException(`Invalid relation target: ${invalid}`);
-    }
+    });
   }
 }

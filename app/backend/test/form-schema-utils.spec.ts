@@ -181,11 +181,20 @@ describe('shared Form Schema utilities', () => {
 
     expect(resolveLocalizedText({ en: 'Hello', 'zh-CN': '你好' }, 'en')).toBe('Hello');
     expect(resolveLocalizedText({ en: 'Hello' }, 'zh-CN')).toBe('Hello');
+    expect(resolveLocalizedText(
+      { en: 'Hello', fr: '', 'zh-CN': '你好' },
+      'fr',
+      'en',
+    )).toBe('Hello');
     expect(getRootExtension(schema)?.datasetId).toBe('ds_1');
     expect(getItemExtension(schema.properties[itemId])?.ui?.widget).toBe('radio');
     expect(getRequiredItemIds(schema).has(itemId)).toBe(true);
     expect(getChoiceOptions(schema.properties[itemId], 'zh-CN')).toEqual([
       { label: '研发', value: 'engineering' },
+      { label: 'design', value: 'design' },
+    ]);
+    expect(getChoiceOptions(schema.properties[itemId], 'fr', 'en')).toEqual([
+      { label: 'Eng', value: 'engineering' },
       { label: 'design', value: 'design' },
     ]);
     expect(createInitialFormState(schema)).toEqual({ [itemId]: 'engineering' });

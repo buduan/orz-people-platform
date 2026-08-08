@@ -56,6 +56,7 @@ const emit = defineEmits<{
 const formContext = inject<Ref<FormRenderContext> | null>('formRenderContext', null);
 
 const locale = computed(() => formContext?.value.locale ?? 'zh-CN');
+const defaultLocale = computed(() => formContext?.value.defaultLocale ?? 'zh-CN');
 const schema = computed(() => formContext?.value.schema);
 const state = computed(() => formContext?.value.state);
 
@@ -73,12 +74,20 @@ const visible = computed(() => isItemVisible(itemExtension.value, state.value ??
 
 const resolvedTitle = computed(() => {
   if (props.title !== undefined) return props.title;
-  return resolveLocalizedText(itemExtension.value?.i18n?.title, locale.value) ?? props.fieldId;
+  return resolveLocalizedText(
+    itemExtension.value?.i18n?.title,
+    locale.value,
+    defaultLocale.value,
+  ) ?? props.fieldId;
 });
 
 const resolvedDescription = computed(() => {
   if (props.description !== undefined) return props.description;
-  return resolveLocalizedText(itemExtension.value?.i18n?.description, locale.value);
+  return resolveLocalizedText(
+    itemExtension.value?.i18n?.description,
+    locale.value,
+    defaultLocale.value,
+  );
 });
 
 const fieldName = computed(() => props.name ?? props.fieldId);
@@ -90,10 +99,18 @@ const widgetName = computed(() => resolveWidgetName(itemExtension.value?.ui?.wid
 const leafComponent = computed(() => resolveFormComponent(widgetName.value));
 
 const placeholder = computed(() => (
-  resolveLocalizedText(itemExtension.value?.i18n?.placeholder, locale.value)
+  resolveLocalizedText(
+    itemExtension.value?.i18n?.placeholder,
+    locale.value,
+    defaultLocale.value,
+  )
 ));
 
-const choiceOptions = computed(() => getChoiceOptions(property.value, locale.value));
+const choiceOptions = computed(() => getChoiceOptions(
+  property.value,
+  locale.value,
+  defaultLocale.value,
+));
 
 const leafProps = computed(() => {
   const base: Record<string, unknown> = {

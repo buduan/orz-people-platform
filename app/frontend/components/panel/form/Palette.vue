@@ -1,12 +1,42 @@
+<script setup lang="ts">
+/* eslint-disable vue/valid-v-for -- Palette keys use widget registry names */
+import { formWidgetDefinitions } from '~/components/form/component-map';
+
+withDefaults(defineProps<{
+  disabled?: boolean;
+}>(), {
+  disabled: false,
+});
+
+const emit = defineEmits<{
+  add: [widget: string];
+}>();
+</script>
+
 <template>
-  <div class="h-full p-4 space-y-4">
-    <h3 class="text-sm font-medium">调色板</h3>
+  <div class="h-full space-y-4 p-4">
+    <div>
+      <h2 class="text-sm font-semibold text-highlighted">
+        表单项
+      </h2>
+      <p class="mt-1 text-xs leading-5 text-muted">
+        点击控件，将其插入当前选中项之后。
+      </p>
+    </div>
     <div class="flex flex-col gap-2">
-      <!-- Form field components will be rendered here -->
+      <UButton
+        v-for="widget in formWidgetDefinitions"
+        :key="widget.widget"
+        :label="widget.label"
+        :icon="widget.icon"
+        color="neutral"
+        variant="soft"
+        size="lg"
+        block
+        :disabled="disabled"
+        class="min-h-11 justify-start rounded-xl text-left"
+        @click="emit('add', widget.widget)"
+      />
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-</script>
-  

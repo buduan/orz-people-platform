@@ -22,6 +22,7 @@ export type FormRenderMode = 'edit' | 'fill';
 
 /** FormRenderer → FormField 的共享上下文。 */
 export interface FormRenderContext {
+  defaultLocale: string;
   locale: string;
   mode: FormRenderMode;
   schema: JsonSchema;

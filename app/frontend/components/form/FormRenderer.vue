@@ -17,9 +17,11 @@ const props = withDefaults(defineProps<{
   schema: JsonSchema;
   mode?: FormRenderMode;
   locale?: string;
+  defaultLocale?: string;
 }>(), {
   mode: 'fill',
   locale: 'zh-CN',
+  defaultLocale: 'zh-CN',
 });
 
 const state = defineModel<Record<FormItemId, JsonValue | undefined>>({
@@ -46,6 +48,7 @@ const { selectedFieldId: activeEditingId, clearEditing } = useFormFieldEditingSt
 const properties = computed(() => getSchemaProperties(props.schema));
 
 const formContext = computed<FormRenderContext>(() => ({
+  defaultLocale: props.defaultLocale,
   locale: props.locale,
   mode: props.mode,
   schema: props.schema,

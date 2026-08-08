@@ -46,6 +46,7 @@ Form Schema 根对象必须满足：
   "x-form": {
     "version": 1,
     "datasetId": "ds_...",
+    "i18n": { "title": { "zh-CN": "成员资料" } },
     "capture": {}
   }
 }
@@ -103,13 +104,14 @@ q_<UUID v4>
 
 ## 根扩展 `x-form`
 
-根扩展只允许下列键，且均为必填结构：
+根扩展只允许下列键：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `version` | `1` | 扩展协议版本，当前固定为 `1`。 |
 | `datasetId` | string | 绑定的 Dataset ID，必须与 Form 所属 Dataset 一致。 |
 | `capture` | object | 设备信息采集；可为空对象。 |
+| `i18n` | object（可选） | 表单级 `title` / `description` / `placeholder` 多语言文案；编辑器会同步表单标题至 `i18n.title`。 |
 
 根扩展**不包含** `layout`。未知键（含历史 `layout`）会被 `validateFormSchemaExtensions` 拒绝。
 
@@ -132,7 +134,13 @@ Item 扩展允许的键：
 
 多语言 map 的 key 为 BCP 47 locale（如 `zh-CN`、`en`），value 为字符串，且 map 不能为空。
 
-`resolveLocalizedText(map, locale)` 的解析顺序：请求 locale → `zh-CN` → 第一个字符串值。
+`resolveLocalizedText(map, locale, defaultLocale)` 的解析顺序：当前 locale → Form 的
+`defaultLocale` → 第一条非空字符串。编辑器把 `defaultLocale` 作为稳定的第一语言；切换语言只
+改变当前编辑语言，不会重排或修改默认语言。
+
+新增语言使用 BCP 47 标识（例如 `en`、`en-US`），经
+`Intl.getCanonicalLocales` 规范化后写入表单标题 map。字段和选项翻译在用户实际编辑时惰性写入
+当前语言 key；缺失翻译仅在渲染时回退，不会覆盖其他语言。
 
 ### `ui`
 
@@ -216,6 +224,19 @@ Item 扩展允许的键：
 4. **业务校验**：Dataset 绑定、字段一对一映射、系统字段不可写、关联安全策略、特殊 Dataset 的登录/写入模式约束、capture 系统字段、`create_row` 下必填字段覆盖等。
 
 提交答案时，服务端再次用 AJV 按已发布 Schema 校验 payload，并完成规范化、幂等与写入。
+
+## 面板编辑与源码保存
+
+`/panel/form/:id` 将 `draft ?? release` 克隆为当前编辑会话唯一的 Schema/元数据状态。Palette、
+画布、Settings 和 Header 保存都修改或提交这一份状态，不存在另一份客户端 Form document。
+
+Header 的「源码」在 Nuxt UI Modal 中按需加载 Monaco。源码先经过 JSON 解析、根约束和共享
+`x-form` 校验，再通过 `saveFormDraft` 把完整 Schema 与版本元数据发送至后端；AJV、Dataset
+映射和业务校验仍以后端为准。解析、校验、revision 或编辑锁冲突都会保留 Modal 和源码文本，
+成功后才刷新本地 revision/checksum 并关闭。
+
+编辑页进入时通过 Redis 获取 90 秒独占锁，每 30 秒续租；保存与发布还必须同时携带匹配的锁
+token 和 `expectedRevision`。锁丢失后页面保留未保存内容但禁用所有 mutation，避免静默覆盖。
 
 共享包职责边界：
 

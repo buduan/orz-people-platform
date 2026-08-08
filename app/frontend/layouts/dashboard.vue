@@ -37,6 +37,11 @@ const navigation: NavigationMenuItem[] = [
     to: '/organization',
   },
   {
+    label: 'Forms',
+    icon: 'i-solar-notes-bold-duotone',
+    to: '/panel/form',
+  },
+  {
     label: 'Administration',
     type: 'label',
   },

@@ -142,7 +142,12 @@ export class FormSubmissionsService {
     });
 
     // ---- 幂等检查（事务外） ----
-    const existing = await this.checkIdempotent(this.prisma, form.id, idempotencyKey, payloadChecksum);
+    const existing = await this.checkIdempotent(
+      this.prisma,
+      form.id,
+      idempotencyKey,
+      payloadChecksum,
+    );
     if (existing) return existing;
 
     const version = form.activeVersion;
@@ -278,8 +283,13 @@ export class FormSubmissionsService {
       // P2002 / P2034 = 并发写入冲突；在事务外再次尝试幂等匹配。
       if (error instanceof Prisma.PrismaClientKnownRequestError
         && (error.code === 'P2002' || error.code === 'P2034')) {
-        const existing = await this.checkIdempotent(this.prisma, form.id, idempotencyKey, payloadChecksum);
-        if (existing) return existing;
+        const retryExisting = await this.checkIdempotent(
+          this.prisma,
+          form.id,
+          idempotencyKey,
+          payloadChecksum,
+        );
+        if (retryExisting) return retryExisting;
         throw new ConflictException('Submission changed concurrently');
       }
       throw error;

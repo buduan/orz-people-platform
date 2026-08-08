@@ -139,7 +139,8 @@ function validateItemExtension(
   if (extension.availableIf !== undefined) {
     const expression = parseAvailableIf(extension.availableIf);
     // availableIf 引用的 Form item ID 必须存在。
-    const missing = referencedAvailableIfFields(expression).find((fieldId) => !itemIds.has(fieldId));
+    const missing = referencedAvailableIfFields(expression)
+      .find((fieldId) => !itemIds.has(fieldId));
     if (missing) throw new TypeError(`Unknown availableIf Form item: ${missing}`);
   }
 }
@@ -155,13 +156,14 @@ function validateCapture(value: unknown): void {
   });
 }
 
-/** 校验 Form 根 x-form 扩展：版本号、datasetId、采集设置。 */
+/** 校验 Form 根 x-form 扩展：版本号、datasetId、多语言文案和采集设置。 */
 function validateRootExtension(value: unknown): void {
   const extension = asRecord(value, 'Form root x-form');
-  assertKeys(extension, ['capture', 'datasetId', 'version'], 'Form root x-form');
+  assertKeys(extension, ['capture', 'datasetId', 'i18n', 'version'], 'Form root x-form');
   if (extension.version !== 1) throw new TypeError('Form root x-form version must be 1');
   assertString(extension.datasetId, 'Form root datasetId');
   validateCapture(extension.capture);
+  if (extension.i18n !== undefined) validateI18n(extension.i18n, 'Form root i18n');
 }
 
 /** 校验 oneOf 选项的 x-form 扩展（i18n 文案）。 */
@@ -207,15 +209,19 @@ export function validateFormSchemaExtensions(
 
 // ---- 读路径（软解析，供渲染 / 提交映射；非法结构返回 null / 空值）----
 
-/** 解析多语言文案：优先 locale，其次 zh-CN，否则取第一个值。 */
+/** 解析多语言文案：优先 locale，其次 fallbackLocale，最后取第一条非空文案。 */
 export function resolveLocalizedText(
   map: LocalizedText | undefined,
   locale = 'zh-CN',
+  fallbackLocale = 'zh-CN',
 ): string | undefined {
   if (!map) return undefined;
-  if (typeof map[locale] === 'string') return map[locale];
-  if (typeof map['zh-CN'] === 'string') return map['zh-CN'];
-  return Object.values(map).find((value) => typeof value === 'string');
+  if (typeof map[locale] === 'string' && map[locale].length > 0) return map[locale];
+  if (
+    typeof map[fallbackLocale] === 'string'
+    && map[fallbackLocale].length > 0
+  ) return map[fallbackLocale];
+  return Object.values(map).find((value) => typeof value === 'string' && value.length > 0);
 }
 
 /** 读取 Form 根 x-form 扩展；结构不符时返回 null。 */
@@ -253,6 +259,7 @@ export function getRequiredItemIds(schema: JsonSchema): ReadonlySet<string> {
 export function getChoiceOptions(
   property: unknown,
   locale = 'zh-CN',
+  fallbackLocale = 'zh-CN',
 ): FormChoiceOption[] {
   if (!isRecord(property) || !Array.isArray(property.oneOf)) return [];
   return property.oneOf.flatMap((rawChoice) => {
@@ -262,7 +269,7 @@ export function getChoiceOptions(
     const extension = isRecord(rawChoice['x-form']) ? rawChoice['x-form'] : undefined;
     const i18n = extension && isRecord(extension.i18n) ? extension.i18n : undefined;
     const titleMap = i18n && isRecord(i18n.title) ? i18n.title as LocalizedText : undefined;
-    const label = resolveLocalizedText(titleMap, locale) ?? String(value);
+    const label = resolveLocalizedText(titleMap, locale, fallbackLocale) ?? String(value);
     return [{ label, value }];
   });
 }
