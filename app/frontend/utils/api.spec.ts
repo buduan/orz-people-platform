@@ -2,7 +2,7 @@ import {
   afterEach, describe, expect, it, vi,
 } from 'vitest';
 
-import { apiStatuses, type ApiStatus } from '@orz-people-platform/types';
+import { apiStatuses, type ApiStatus } from '@weave/types';
 
 import { createApiClient } from './api';
 

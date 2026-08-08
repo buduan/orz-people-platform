@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import { computed, readonly, shallowRef } from 'vue';
 
-import { apiStatuses } from '@orz-people-platform/types';
+import { apiStatuses } from '@weave/types';
 
 import { toApiError } from '~/utils/api';
 import { authErrorMessage, useAuthFlow } from './useAuthFlow';

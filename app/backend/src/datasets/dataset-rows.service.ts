@@ -18,7 +18,7 @@ import type {
   DatasetTableQuery,
   DatasetWindowQueryRequest,
   DatasetWindowQueryResponse,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   applyDatasetQuery,
   createDatasetGroupDirectory,
@@ -27,7 +27,7 @@ import {
   getDatasetQueryFingerprint,
   isDatasetFieldGroupable,
   isDatasetQueryEmpty,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';

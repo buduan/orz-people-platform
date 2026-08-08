@@ -3,7 +3,7 @@ import {
   permissionKeys,
   workspacePermissionKeys,
   type PermissionKey,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 export interface DirectPermissionAssignment {
   effect: 'allow' | 'deny';

@@ -17,7 +17,7 @@ import type {
   DatasetPanelDetail,
   DatasetSummary,
   DatasetWindowQueryRequest,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import { CurrentActor } from '../authorization/authorization.decorators';
 import { DatasetRowsService } from './dataset-rows.service';

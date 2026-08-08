@@ -1,6 +1,6 @@
 # Utils 工具方法
 
-`@orz-people-platform/utils` 提供前后端共享的轻量工具，覆盖身份标识规范化、密码策略、JSON 稳定化、表单条件表达式和表单 Schema 扩展校验。
+`@weave/utils` 提供前后端共享的轻量工具，覆盖身份标识规范化、密码策略、JSON 稳定化、表单条件表达式和表单 Schema 扩展校验。
 
 从包入口导入工具：
 
@@ -9,7 +9,7 @@ import {
   canonicalizeJson,
   normalizeEmail,
   validatePassword,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 ```
 
 ## 导出概览

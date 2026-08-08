@@ -1,4 +1,4 @@
-name: orz-people-platform-dev
+name: weave-dev
 
 services:
   postgres:

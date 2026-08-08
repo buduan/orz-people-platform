@@ -6,13 +6,13 @@ import type {
   FormItemId,
   JsonSchema,
   JsonValue,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   filterVisibleAnswers,
   getItemExtension,
   getSchemaProperties,
   resolveLocalizedText,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 
 export interface FormFillingValidationResult {
   answers: Record<FormItemId, JsonValue>;

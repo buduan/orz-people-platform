@@ -23,7 +23,7 @@ export class AppController {
           type: 'object',
           required: ['service', 'status'],
           properties: {
-            service: { type: 'string', example: 'orz-people-platform-backend' },
+            service: { type: 'string', example: 'weave-backend' },
             status: { type: 'string', example: 'ok' },
           },
         },

@@ -7,7 +7,7 @@ import type {
   JsonSchema,
   RelationCardinality,
   UpdateDatasetFieldRequest,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import { computed, reactive, watch } from '#imports';
 
 type CreateInput = Omit<CreateDatasetFieldRequest, 'expectedDatasetRevision'>;

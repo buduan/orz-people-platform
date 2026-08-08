@@ -7,7 +7,7 @@ import type {
   AuthenticatedActor,
   DatasetDetailResponse,
   DatasetFieldDefinition,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import { DatasetRowsService } from '../../src/datasets/dataset-rows.service';
 import { DatasetsService } from '../../src/datasets/datasets.service';

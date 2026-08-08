@@ -4,7 +4,7 @@ import type {
   CreateDatasetRowRequest,
   DatasetFieldDefinition,
   JsonValue,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import type { VirtualItem } from '@tanstack/vue-virtual';
 import { useEventListener } from '@vueuse/core';

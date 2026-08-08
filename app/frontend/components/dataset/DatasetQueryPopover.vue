@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable vue/valid-v-for -- vue-eslint-parser misses these scoped aliases. */
-import type { DatasetFieldDefinition, JsonValue } from '@orz-people-platform/types';
+import type { DatasetFieldDefinition, JsonValue } from '@weave/types';
 import { computed, shallowRef, watch } from '#imports';
 import {
   cloneDatasetQuery,

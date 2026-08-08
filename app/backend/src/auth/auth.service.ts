@@ -14,10 +14,10 @@ import {
   type LoginOptions,
   type RegistrationStarted,
   type RegistrationVerified,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   isE164Phone, normalizeEmail, normalizeUsername, validatePassword,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';

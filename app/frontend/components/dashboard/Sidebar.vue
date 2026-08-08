@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui';
-import type { WorkspaceSummary } from '@orz-people-platform/types';
+import type { WorkspaceSummary } from '@weave/types';
 
 type WorkspaceOption = Pick<WorkspaceSummary, 'id' | 'name' | 'slug'>;
 

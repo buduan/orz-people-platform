@@ -2,7 +2,7 @@ import type {
   JsonValue,
   AvailableIfExpression,
   AvailableIfLeafOperator,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import { canonicalizeJson } from './json';
 

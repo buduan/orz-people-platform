@@ -1,4 +1,4 @@
-import { normalizeEmail } from '@orz-people-platform/utils';
+import { normalizeEmail } from '@weave/utils';
 
 const maximumUsernameLength = 64;
 

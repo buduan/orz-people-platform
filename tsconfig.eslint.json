@@ -4,7 +4,7 @@
     "allowJs": false,
     "noEmit": true,
     "paths": {
-      "@orz-people-platform/utils": [
+      "@weave/utils": [
         "packages/utils/src"
       ],
       "~/*": [

@@ -24,7 +24,7 @@ When a panel page needs a dashboard breadcrumb, set its page name with `title` i
 
 ## Shared Types & Utilities
 
-Place types used by both applications in `packages/types/src/` and import them through `@orz-people-platform/types`. Examples include API request and response bodies, pagination and error envelopes, shared enums, identifiers, and framework-neutral domain contracts. Do not duplicate these definitions in an application.
+Place types used by both applications in `packages/types/src/` and import them through `@weave/types`. Examples include API request and response bodies, pagination and error envelopes, shared enums, identifiers, and framework-neutral domain contracts. Do not duplicate these definitions in an application.
 
 Before adding a frontend or backend helper, decide whether the other application can reuse it. Place reusable, framework-neutral functions—such as parsing, normalization, date formatting, or shared validation helpers—in `packages/utils/src/`. Keep application-specific or framework-coupled behavior inside its owning application.
 

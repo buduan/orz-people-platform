@@ -1,5 +1,5 @@
-import type { FormItemId, JsonValue } from '@orz-people-platform/types';
-import { canonicalizeJson } from '@orz-people-platform/utils';
+import type { FormItemId, JsonValue } from '@weave/types';
+import { canonicalizeJson } from '@weave/utils';
 
 export interface RelationOptionRequest {
   key: string;

@@ -14,7 +14,7 @@ import {
   Prisma,
 } from '@prisma/client';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type { AuthenticatedActor } from '@weave/types';
 
 import { AuditService } from '../audit/audit.service';
 import { DatasetsService } from '../datasets/datasets.service';

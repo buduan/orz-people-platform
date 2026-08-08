@@ -8,7 +8,7 @@ import {
   useRequestURL,
   useRoute,
 } from '#imports';
-import type { MfaRequired } from '@orz-people-platform/types';
+import type { MfaRequired } from '@weave/types';
 
 import { resolveSafeRedirect } from '~/utils/redirect';
 

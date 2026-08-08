@@ -22,7 +22,7 @@ import type {
   DatasetFieldDefinition,
   DatasetListResponse,
   DatasetSummary,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';

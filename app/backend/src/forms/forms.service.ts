@@ -35,8 +35,8 @@ import type {
   ReleaseFormEditLockResult,
   RelationFilterCondition,
   RelationFilterExpression,
-} from '@orz-people-platform/types';
-import { checksumJson, resolveLocalizedText } from '@orz-people-platform/utils';
+} from '@weave/types';
+import { checksumJson, resolveLocalizedText } from '@weave/utils';
 
 import { AuditService } from '../audit/audit.service';
 import { DatasetsService } from '../datasets/datasets.service';

@@ -11,7 +11,7 @@ import type {
   DatasetTableQuery,
   DatasetWindowQueryScope,
   JsonValue,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import { canonicalizeJson } from './json';
 
 export interface DatasetFilterOperatorOption {

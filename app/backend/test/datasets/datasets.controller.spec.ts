@@ -2,7 +2,7 @@ import {
   describe, expect, it, vi,
 } from 'vitest';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type { AuthenticatedActor } from '@weave/types';
 
 import { DatasetsController } from '../../src/datasets/datasets.controller';
 

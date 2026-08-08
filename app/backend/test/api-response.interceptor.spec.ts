@@ -11,7 +11,7 @@ import {
   vi,
 } from 'vitest';
 
-import { apiStatuses } from '@orz-people-platform/types';
+import { apiStatuses } from '@weave/types';
 
 import { ApiResponseInterceptor } from '../src/api-response.interceptor';
 import { HttpExceptionFilter } from '../src/http-exception.filter';

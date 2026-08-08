@@ -50,8 +50,8 @@ export class AuthSettingsService {
     this.hmacSecret = config.get('AUTH_HMAC_SECRET') || 'development-only-change-me-hmac-secret';
     this.totpEncryptionKey = config.get('TOTP_ENCRYPTION_KEY') || 'development-only-change-me-totp-key';
     this.totpPeriodSeconds = positiveInteger(config.get('TOTP_PERIOD_SECONDS'), 30, 'TOTP_PERIOD_SECONDS');
-    this.issuer = config.get('JWT_ISSUER') || 'orz-people-platform';
-    this.audience = config.get('JWT_AUDIENCE') || 'orz-people-platform-api';
+    this.issuer = config.get('JWT_ISSUER') || 'weave';
+    this.audience = config.get('JWT_AUDIENCE') || 'weave-api';
     this.webauthnRpId = config.get('WEBAUTHN_RP_ID') || 'localhost';
     this.webauthnRpName = config.get('WEBAUTHN_RP_NAME') || 'Orz People Platform';
     this.webauthnOrigins = (config.get<string>('WEBAUTHN_ORIGINS') || 'http://localhost:6771')

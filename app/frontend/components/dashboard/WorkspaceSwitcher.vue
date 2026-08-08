@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui';
-import type { WorkspaceSummary } from '@orz-people-platform/types';
+import type { WorkspaceSummary } from '@weave/types';
 import { computed } from '#imports';
 
 type WorkspaceOption = Pick<WorkspaceSummary, 'id' | 'name' | 'slug'>;

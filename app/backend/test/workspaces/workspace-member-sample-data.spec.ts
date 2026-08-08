@@ -6,8 +6,8 @@ import {
   vi,
 } from 'vitest';
 
-import type { JsonValue } from '@orz-people-platform/types';
-import { checksumJson } from '@orz-people-platform/utils';
+import type { JsonValue } from '@weave/types';
+import { checksumJson } from '@weave/utils';
 
 import { UsersService } from '../../src/users/users.service';
 import {

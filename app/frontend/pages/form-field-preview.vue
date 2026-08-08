@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from '#imports';
-import type { JsonSchema, JsonValue } from '@orz-people-platform/types';
+import type { JsonSchema, JsonValue } from '@weave/types';
 import type { FormRenderMode } from '~/components/form/types';
 
 /** 固定 UUID，保证 mock schema 可重复。 */

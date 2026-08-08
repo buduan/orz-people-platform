@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import type { JsonSchemaObject } from '@orz-people-platform/types';
+import type { JsonSchemaObject } from '@weave/types';
 
 import FormItemsCascader from './items/Cascader.vue';
 import FormItemsCheckbox from './items/Checkbox.vue';

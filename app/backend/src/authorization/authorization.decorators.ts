@@ -1,6 +1,6 @@
 import { createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
 
-import type { AuthenticatedActor, PermissionKey } from '@orz-people-platform/types';
+import type { AuthenticatedActor, PermissionKey } from '@weave/types';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const IS_OPTIONAL_AUTHENTICATION_KEY = 'isOptionalAuthentication';

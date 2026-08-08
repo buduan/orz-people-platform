@@ -15,9 +15,9 @@ COPY app/frontend app/frontend
 COPY packages/types packages/types
 COPY packages/utils packages/utils
 
-RUN pnpm --filter @orz-people-platform/types build \
-  && pnpm --filter @orz-people-platform/utils build \
-  && pnpm --filter @orz-people-platform/frontend build
+RUN pnpm --filter @weave/types build \
+  && pnpm --filter @weave/utils build \
+  && pnpm --filter @weave/frontend build
 
 FROM node:22-alpine AS runtime
 

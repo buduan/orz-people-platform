@@ -11,7 +11,7 @@ import {
   MinLength,
 } from 'class-validator';
 
-import type { JsonValue, SubmitFormRequest } from '@orz-people-platform/types';
+import type { JsonValue, SubmitFormRequest } from '@weave/types';
 
 export class FormIdParamsDto {
   @IsString()

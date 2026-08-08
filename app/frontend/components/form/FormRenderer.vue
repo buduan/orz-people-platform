@@ -8,8 +8,8 @@ import {
   useTemplateRef,
   watch,
 } from '#imports';
-import type { FormItemId, JsonSchema, JsonValue } from '@orz-people-platform/types';
-import { createInitialFormState, getSchemaProperties } from '@orz-people-platform/utils';
+import type { FormItemId, JsonSchema, JsonValue } from '@weave/types';
+import { createInitialFormState, getSchemaProperties } from '@weave/utils';
 import { useFormFieldEditingState } from '~/composables/useFormFieldEditing';
 import {
   formRenderContextKey,

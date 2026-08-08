@@ -3,7 +3,7 @@ import {
   type ApiErrorResponse,
   type ApiResponse,
   type ApiStatus,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 /**
  * 鉴权模式：

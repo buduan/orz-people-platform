@@ -2,7 +2,7 @@
 import {
   computed, shallowRef, useAuthFlow,
 } from '#imports';
-import { validatePassword } from '@orz-people-platform/utils';
+import { validatePassword } from '@weave/utils';
 
 const emit = defineEmits<{
   cancel: [];

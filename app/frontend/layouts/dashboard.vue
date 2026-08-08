@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui';
-import type { WorkspaceSummary } from '@orz-people-platform/types';
+import type { WorkspaceSummary } from '@weave/types';
 
 import { useAuthStore } from '~/stores/auth';
 import { computed, shallowRef, useState } from '#imports';

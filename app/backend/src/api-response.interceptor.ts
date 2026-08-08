@@ -4,7 +4,7 @@ import {
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { apiStatuses, type ApiResponse } from '@orz-people-platform/types';
+import { apiStatuses, type ApiResponse } from '@weave/types';
 
 @Injectable()
 export class ApiResponseInterceptor implements NestInterceptor {

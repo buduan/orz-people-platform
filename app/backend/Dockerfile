@@ -15,8 +15,8 @@ COPY app/backend ./app/backend
 COPY packages ./packages
 COPY tsconfig.base.json ./
 
-RUN pnpm --filter @orz-people-platform/backend... run build \
-  && pnpm --filter @orz-people-platform/backend deploy --prod --legacy /production
+RUN pnpm --filter @weave/backend... run build \
+  && pnpm --filter @weave/backend deploy --prod --legacy /production
 
 FROM node:22-alpine AS runner
 

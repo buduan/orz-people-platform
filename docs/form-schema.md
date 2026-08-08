@@ -62,7 +62,7 @@ Form Schema 根对象必须满足：
 q_<UUID v4>
 ```
 
-使用 `@orz-people-platform/utils` 的 `createFormItemId()` 生成。ID 一经发布应保持稳定，供 `availableIf`、关联筛选 `valueFrom` 与提交答案键名引用。
+使用 `@weave/utils` 的 `createFormItemId()` 生成。ID 一经发布应保持稳定，供 `availableIf`、关联筛选 `valueFrom` 与提交答案键名引用。
 
 ## Form item：标准 JSON Schema 落点
 
@@ -271,8 +271,8 @@ token 和 `expectedRevision`。锁丢失后页面保留未保存内容但禁用�
 
 | 层级 | 职责 |
 | --- | --- |
-| `@orz-people-platform/types` | 类型与常量契约 |
-| `@orz-people-platform/utils` | 扩展结构校验、条件解析/求值、软读 helper |
+| `@weave/types` | 类型与常量契约 |
+| `@weave/utils` | 扩展结构校验、条件解析/求值、软读 helper |
 | `FormDefinitionValidatorService` | AJV + 扩展校验 + Dataset/权限类业务不变量 |
 
 `validateFormSchemaExtensions` 不能替代 AJV。外部输入应先标准 Schema 编译，再跑平台扩展校验。

@@ -28,7 +28,7 @@ legacy `User` rows do not contain the required email, username, and nickname map
 Run Prisma generation and migration deployment after reviewing the target database.
 
 ```bash
-pnpm --filter @orz-people-platform/backend prisma:generate
+pnpm --filter @weave/backend prisma:generate
 pnpm migrate
 ```
 
@@ -99,7 +99,7 @@ depend on those delivery providers.
 Run the focused security tests and standard workspace checks before review.
 
 ```bash
-pnpm --filter @orz-people-platform/backend test
+pnpm --filter @weave/backend test
 pnpm lint
 pnpm typecheck
 pnpm build

@@ -7,7 +7,7 @@ import {
   type MfaFactor,
   type RegistrationStarted,
   type RegistrationVerified,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import { toApiError } from '~/utils/api';
 

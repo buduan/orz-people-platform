@@ -237,13 +237,13 @@ pnpm build
 后端测试：
 
 ```bash
-pnpm --filter @orz-people-platform/backend test
+pnpm --filter @weave/backend test
 ```
 
 前端测试目前没有 package script，可以直接运行 Vitest：
 
 ```bash
-pnpm --filter @orz-people-platform/frontend exec vitest run
+pnpm --filter @weave/frontend exec vitest run
 ```
 
 测试覆盖认证安全策略、OTP/MFA/Session、权限解析、Workspace 边界、Dataset HTTP DTO/能力/窗口/关联选项、Dataset/Form 服务、特殊 Dataset 事务、统一 API 响应、Pinia Token 状态、Dataset 前端查询适配和 API 错误处理。
@@ -251,7 +251,7 @@ pnpm --filter @orz-people-platform/frontend exec vitest run
 ## 开发约定
 
 - 跨前后端使用的类型放在 `packages/types/src/`，框架无关的工具放在 `packages/utils/src/`。
-- 修改 Prisma Schema 后先运行 `pnpm --filter @orz-people-platform/backend prisma:generate`，再创建或部署迁移。
+- 修改 Prisma Schema 后先运行 `pnpm --filter @weave/backend prisma:generate`，再创建或部署迁移。
 - 不要编辑 `dist/`、`.nuxt/` 或 `.output/` 生成目录。
 - 遵循仓库现有的 TypeScript/Vue 风格：严格类型、两空格缩进、单引号、分号、尾逗号，以及 Vue 3 `<script setup lang="ts">`。
 - 新增或修改后端写操作时，应沿用现有的 Workspace 边界、事务、乐观锁和审计模式。

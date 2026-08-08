@@ -15,7 +15,7 @@ import {
   MinLength,
 } from 'class-validator';
 
-import { formListSections, type FormListSection } from '@orz-people-platform/types';
+import { formListSections, type FormListSection } from '@weave/types';
 
 class FormDefinitionDto {
   @IsString()

@@ -9,7 +9,7 @@ import type {
   DatasetSummary,
   DatasetTableQuery,
   JsonValue,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 export type {
   DatasetAggregateOperation,
@@ -25,7 +25,7 @@ export type {
   DatasetTableQuery,
   DatasetWindowQueryRequest,
   DatasetWindowQueryResponse,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 export interface DatasetQueryOpenRequest {
   id: number;

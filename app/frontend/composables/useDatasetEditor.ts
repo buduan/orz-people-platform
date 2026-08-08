@@ -16,12 +16,12 @@ import type {
   DeleteDatasetRowRequest,
   UpdateDatasetFieldRequest,
   UpdateDatasetRequest,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   canonicalizeDatasetQuery,
   EMPTY_DATASET_QUERY,
   getDatasetQueryFingerprint,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 import type {
   DatasetCellCommitPayload,
   DatasetCellCoordinates,

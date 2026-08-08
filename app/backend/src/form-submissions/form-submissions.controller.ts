@@ -14,7 +14,7 @@ import type {
   AuthenticatedActor,
   PublishedFormDefinition,
   SubmitFormResult,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import {
   CurrentActor,

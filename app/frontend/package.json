@@ -1,17 +1,17 @@
 {
-  "name": "@orz-people-platform/frontend",
+  "name": "@weave/frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev --dotenv ../../.env --host 0.0.0.0",
     "preview": "nuxt preview --host 0.0.0.0",
-    "typecheck": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && nuxt typecheck"
+    "typecheck": "pnpm --filter @weave/types build && pnpm --filter @weave/utils build && nuxt typecheck"
   },
   "dependencies": {
     "@nuxt/ui": "^4.10.0",
-    "@orz-people-platform/types": "workspace:*",
-    "@orz-people-platform/utils": "workspace:*",
+    "@weave/types": "workspace:*",
+    "@weave/utils": "workspace:*",
     "@pinia/nuxt": "catalog:",
     "@tanstack/vue-query": "^5.101.4",
     "@tanstack/vue-virtual": "^3.13.32",

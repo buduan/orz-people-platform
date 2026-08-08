@@ -7,7 +7,7 @@ import {
   normalizeEmail,
   normalizeUsername,
   validatePassword,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 
 import { RegistrationCompleteDto, RegistrationStartDto } from '../../src/auth/auth.dto';
 import { hasViableLoginPath } from '../../src/auth/login-path';

@@ -5,7 +5,7 @@ import type {
   DatasetFieldKind,
   DatasetPanelDetail,
   JsonSchemaObject,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import { computed, ref, shallowRef } from '#imports';
 import {
   canonicalizeFormLocale,

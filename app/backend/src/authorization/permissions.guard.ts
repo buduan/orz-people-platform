@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import type { AuthenticatedActor, PermissionKey } from '@orz-people-platform/types';
+import type { AuthenticatedActor, PermissionKey } from '@weave/types';
 
 import { REQUIRED_PERMISSIONS_KEY } from './authorization.decorators';
 

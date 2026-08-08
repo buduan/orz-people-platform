@@ -13,7 +13,7 @@ import {
   MinLength,
 } from 'class-validator';
 
-import { normalizeEmail, normalizeUsername } from '@orz-people-platform/utils';
+import { normalizeEmail, normalizeUsername } from '@weave/utils';
 
 export class RegistrationStartDto {
   @IsEmail()

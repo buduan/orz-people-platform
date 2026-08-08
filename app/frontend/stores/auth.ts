@@ -2,7 +2,7 @@ import type {
   AuthenticatedActor,
   AuthTokens,
   UserProfile,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import { acceptHMRUpdate, defineStore } from 'pinia';
 
 import { ApiError } from '~/utils/api';

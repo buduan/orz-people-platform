@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
-import type { PermissionKey, AuthenticatedActor } from '@orz-people-platform/types';
+import type { PermissionKey, AuthenticatedActor } from '@weave/types';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentActor, RequirePermissions } from '../authorization/authorization.decorators';

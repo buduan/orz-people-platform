@@ -13,7 +13,7 @@ import {
   vi,
 } from 'vitest';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type { AuthenticatedActor } from '@weave/types';
 
 import { DatasetsService } from '../../src/datasets/datasets.service';
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui';
-import type { DatasetStatus } from '@orz-people-platform/types';
+import type { DatasetStatus } from '@weave/types';
 import { computed } from '#imports';
 
 const props = withDefaults(defineProps<{

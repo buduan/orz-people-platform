@@ -6,7 +6,7 @@ import type {
   DatasetListItem,
   DatasetListResponse,
   DatasetSummary,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   computed, onMounted, shallowRef, useNuxtApp, useRouter, useState,
 } from '#imports';

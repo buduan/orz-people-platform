@@ -9,8 +9,8 @@ import type {
   FormListSection,
   FormPanelSummary,
   JsonSchemaObject,
-} from '@orz-people-platform/types';
-import { createFormItemId } from '@orz-people-platform/utils';
+} from '@weave/types';
+import { createFormItemId } from '@weave/utils';
 import {
   computed,
   definePageMeta,

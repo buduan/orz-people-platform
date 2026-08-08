@@ -2,11 +2,11 @@ import type {
   FormDraftDefinitionInput,
   JsonSchemaObject,
   LocalizedText,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   resolveLocalizedText,
   validateFormSchemaExtensions,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 import { orderFormLocales } from './form-locales';
 
 type FormI18nKey = 'description' | 'placeholder' | 'title';

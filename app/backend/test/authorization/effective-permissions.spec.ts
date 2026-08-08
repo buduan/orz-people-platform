@@ -8,7 +8,7 @@ import {
   isPermissionKey,
   permissionKeys,
   workspacePermissionKeys,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import { AuthorizationService } from '../../src/authorization/authorization.service';
 import { resolveEffectivePermissions } from '../../src/authorization/effective-permissions';

@@ -11,11 +11,11 @@ import type {
   FormPanelDetail,
   FormVersionDefinition,
   JsonSchemaObject,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   createFormItemId,
   resolveLocalizedText,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 import {
   computed,
   definePageMeta,

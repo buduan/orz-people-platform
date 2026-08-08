@@ -12,7 +12,7 @@ import {
   apiStatuses,
   type ApiErrorResponse,
   type ApiStatus,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 interface NestErrorBody {
   error?: string;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable vue/valid-v-for -- the template keys use typed v-for aliases */
 import { shallowRef, useAuthFlow } from '#imports';
-import type { MfaRequired } from '@orz-people-platform/types';
+import type { MfaRequired } from '@weave/types';
 
 const props = defineProps<{
   identifier: string;

@@ -4,7 +4,7 @@ import type {
   DatasetStatus,
   DatasetTableQuery,
   UpdateDatasetRowRequest,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import type { DatasetCellCommitPayload } from '~/components/dataset/types';
 
 export function getDatasetEditorPath(datasetId: string): string {

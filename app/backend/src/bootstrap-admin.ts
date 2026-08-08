@@ -4,7 +4,7 @@ import { stdin, stdout } from 'node:process';
 import { PrismaClient, UserStatus, MemberStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 
-import { normalizeEmail, normalizeUsername, validatePassword } from '@orz-people-platform/utils';
+import { normalizeEmail, normalizeUsername, validatePassword } from '@weave/utils';
 import { ensureWorkspaceMemberSampleData } from './workspaces/workspace-member-sample-data';
 
 export interface BootstrapAdminInput {

@@ -1,5 +1,5 @@
 {
-  "name": "orz-people-platform",
+  "name": "weave",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.20.0",
@@ -9,15 +9,15 @@
   },
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=1 run build",
-    "bootstrap:admin": "pnpm --filter @orz-people-platform/backend build && pnpm --filter @orz-people-platform/backend exec dotenv -e ../../.env -- node dist/bootstrap-admin.js",
-    "dev": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm -r --parallel --filter './app/*' run dev",
-    "dev:backend": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm --filter @orz-people-platform/backend dev",
-    "dev:frontend": "pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && pnpm --filter @orz-people-platform/frontend dev",
+    "bootstrap:admin": "pnpm --filter @weave/backend build && pnpm --filter @weave/backend exec dotenv -e ../../.env -- node dist/bootstrap-admin.js",
+    "dev": "pnpm --filter @weave/types build && pnpm --filter @weave/utils build && pnpm -r --parallel --filter './app/*' run dev",
+    "dev:backend": "pnpm --filter @weave/types build && pnpm --filter @weave/utils build && pnpm --filter @weave/backend dev",
+    "dev:frontend": "pnpm --filter @weave/types build && pnpm --filter @weave/utils build && pnpm --filter @weave/frontend dev",
     "lint": "eslint .",
     "lint:changed": "eslint --cache --cache-location .eslintcache .",
     "lint:incremental": "pnpm lint:changed",
-    "migrate": "pnpm --filter @orz-people-platform/backend prisma:deploy",
-    "preview:frontend": "pnpm --filter @orz-people-platform/frontend preview",
+    "migrate": "pnpm --filter @weave/backend prisma:deploy",
+    "preview:frontend": "pnpm --filter @weave/frontend preview",
     "start": "docker compose -f compose.yml up --build",
     "start:db": "docker compose -f compose.dev.yml up -d",
     "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck"

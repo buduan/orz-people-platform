@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { JsonValue } from '@orz-people-platform/types';
+import type { JsonValue } from '@weave/types';
 import { shallowRef } from '#imports';
 import DatasetGrid from './DatasetGrid.vue';
 import DatasetToolbar from './DatasetToolbar.vue';

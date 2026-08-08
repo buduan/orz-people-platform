@@ -1,4 +1,4 @@
-import type { JsonValue } from '@orz-people-platform/types';
+import type { JsonValue } from '@weave/types';
 
 /**
  * 将 JSON 值递归规范化为字符串。

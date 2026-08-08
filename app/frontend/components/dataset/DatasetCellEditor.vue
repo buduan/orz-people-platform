@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { DatasetFieldDefinition, JsonValue } from '@orz-people-platform/types';
+import type { DatasetFieldDefinition, JsonValue } from '@weave/types';
 import { useDocumentVisibility, watchDebounced } from '@vueuse/core';
 import { computed, shallowRef, watch } from '#imports';
-import { parseDatasetFieldInputValue } from '@orz-people-platform/utils';
+import { parseDatasetFieldInputValue } from '@weave/utils';
 import { getDatasetCellFinalizeActions } from './dataset-cell';
 import { getDatasetFieldOptions } from './dataset-query';
 import type {

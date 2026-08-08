@@ -18,7 +18,7 @@ import type {
   DatasetCapabilities,
   DatasetDetailResponse,
   DatasetFieldDefinition,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import { DatasetRowsService } from '../../src/datasets/dataset-rows.service';
 import {

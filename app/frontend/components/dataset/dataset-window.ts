@@ -2,9 +2,9 @@ import type {
   DatasetRowRange,
   DatasetRowData,
   DatasetWindowQueryScope,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
-export type { DatasetWindowQueryScope } from '@orz-people-platform/types';
+export type { DatasetWindowQueryScope } from '@weave/types';
 
 export const DATASET_WINDOW_SIZE = 50;
 

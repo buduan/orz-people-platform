@@ -12,7 +12,7 @@ import {
   vi,
 } from 'vitest';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type { AuthenticatedActor } from '@weave/types';
 
 import { ActivitiesService } from '../../src/special-datasets/activities.service';
 import { JoinRequestsService } from '../../src/special-datasets/join-requests.service';

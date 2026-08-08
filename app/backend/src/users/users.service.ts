@@ -2,8 +2,8 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { MemberStatus, Prisma, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 
-import { apiStatuses, type UserProfile } from '@orz-people-platform/types';
-import { validatePassword } from '@orz-people-platform/utils';
+import { apiStatuses, type UserProfile } from '@weave/types';
+import { validatePassword } from '@weave/utils';
 
 import { AuditService } from '../audit/audit.service';
 import { SessionService } from '../auth/session.service';

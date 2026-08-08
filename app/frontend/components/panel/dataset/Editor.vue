@@ -7,7 +7,7 @@ import type {
   DatasetRowData,
   UpdateDatasetFieldRequest,
   UpdateDatasetRequest,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import type {
   DatasetFieldActionPayload,
   DatasetRowActionPayload,

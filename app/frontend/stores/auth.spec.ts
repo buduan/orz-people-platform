@@ -7,7 +7,7 @@ import {
   computed, ref, shallowRef, type Ref,
 } from 'vue';
 
-import { apiStatuses, type AuthTokens, type UserProfile } from '@orz-people-platform/types';
+import { apiStatuses, type AuthTokens, type UserProfile } from '@weave/types';
 
 import { ApiError } from '~/utils/api';
 import { useAuthStore } from './auth';

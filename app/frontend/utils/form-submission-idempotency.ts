@@ -1,5 +1,5 @@
-import type { JsonValue, SubmitFormRequest } from '@orz-people-platform/types';
-import { canonicalizeJson } from '@orz-people-platform/utils';
+import type { JsonValue, SubmitFormRequest } from '@weave/types';
+import { canonicalizeJson } from '@weave/utils';
 
 export interface FormSubmissionAttempt {
   key: string;

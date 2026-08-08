@@ -9,8 +9,8 @@ import {
   Prisma,
 } from '@prisma/client';
 
-import type { JsonValue } from '@orz-people-platform/types';
-import { checksumJson, createFormItemId } from '@orz-people-platform/utils';
+import type { JsonValue } from '@weave/types';
+import { checksumJson, createFormItemId } from '@weave/utils';
 
 import { createDatasetDefinitionVersion } from '../datasets/dataset-definition-version';
 

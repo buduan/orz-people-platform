@@ -20,7 +20,7 @@ import {
   vi,
 } from 'vitest';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type { AuthenticatedActor } from '@weave/types';
 
 import { FormDefinitionValidatorService } from '../../src/forms/form-definition-validator.service';
 import { FormsService } from '../../src/forms/forms.service';

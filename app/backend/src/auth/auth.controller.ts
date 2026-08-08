@@ -12,7 +12,7 @@ import {
 } from '@nestjs/swagger';
 import type { ApiResponseNoStatusOptions } from '@nestjs/swagger';
 
-import { apiStatuses, type AuthenticatedActor } from '@orz-people-platform/types';
+import { apiStatuses, type AuthenticatedActor } from '@weave/types';
 
 import { CurrentActor, Public } from '../authorization/authorization.decorators';
 import { AuditService } from '../audit/audit.service';

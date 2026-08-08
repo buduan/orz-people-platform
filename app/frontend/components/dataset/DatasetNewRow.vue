@@ -4,11 +4,11 @@ import type {
   CreateDatasetRowRequest,
   DatasetFieldDefinition,
   JsonValue,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   getDatasetFieldOptions,
   parseDatasetFieldInputValue,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 import { reactive, watch } from '#imports';
 import type {
   DatasetOption,

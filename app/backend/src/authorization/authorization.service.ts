@@ -8,7 +8,7 @@ import {
   reservedPermissionKeys,
   type AuthenticatedActor,
   type PermissionKey,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ReauthenticationService } from '../auth/reauthentication.service';

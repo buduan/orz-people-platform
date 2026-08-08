@@ -8,7 +8,7 @@ import {
   vi,
 } from 'vitest';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type { AuthenticatedActor } from '@weave/types';
 
 import { AuthenticationGuard } from '../../src/authorization/authentication.guard';
 import {

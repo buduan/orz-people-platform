@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CreateDatasetRequest } from '@orz-people-platform/types';
+import type { CreateDatasetRequest } from '@weave/types';
 import { computed, reactive, watch } from '#imports';
 
 const props = withDefaults(defineProps<{

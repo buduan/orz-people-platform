@@ -12,7 +12,7 @@ import {
 } from 'class-validator';
 import { UserStatus } from '@prisma/client';
 
-import { normalizeEmail, normalizeUsername } from '@orz-people-platform/utils';
+import { normalizeEmail, normalizeUsername } from '@weave/utils';
 
 export class CreateUserDto {
   @IsEmail()

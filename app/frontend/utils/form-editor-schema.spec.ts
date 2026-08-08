@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { FormDraftDefinitionInput } from '@orz-people-platform/types';
+import type { FormDraftDefinitionInput } from '@weave/types';
 import {
   addFormLocale,
   collectFormLocales,

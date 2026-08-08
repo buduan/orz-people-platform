@@ -3,7 +3,7 @@
 import {
   onBeforeUnmount, onMounted, shallowRef, useAuthFlow,
 } from '#imports';
-import type { MfaFactor, MfaRequired } from '@orz-people-platform/types';
+import type { MfaFactor, MfaRequired } from '@weave/types';
 
 const props = defineProps<{
   challenge: MfaRequired;

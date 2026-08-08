@@ -28,13 +28,13 @@ import type {
   JsonSchema,
   JsonValue,
   SubmitFormResult,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   checksumJson,
   findUnavailableSubmittedItemIds,
   getItemExtension,
   getSchemaProperties,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 
 import { AuditService } from '../audit/audit.service';
 import { RelationValidationService } from '../common/relation-validation.service';

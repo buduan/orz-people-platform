@@ -9,8 +9,8 @@ import {
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 
-import type { JsonSchema } from '@orz-people-platform/types';
-import { validateFormSchemaExtensions } from '@orz-people-platform/utils';
+import type { JsonSchema } from '@weave/types';
+import { validateFormSchemaExtensions } from '@weave/utils';
 
 /** Form 定义发布时的完整校验上下文。 */
 interface DefinitionContext {

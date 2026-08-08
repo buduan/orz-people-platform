@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { JsonSchema } from '@orz-people-platform/types';
+import type { JsonSchema } from '@weave/types';
 
 import { validateFormFilling } from './form-filling-validation';
 

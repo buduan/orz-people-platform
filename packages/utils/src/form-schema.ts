@@ -9,8 +9,8 @@ import type {
   RelationFilterExpression,
   RelationFilterOperator,
   AvailableIfExpression,
-} from '@orz-people-platform/types';
-import { relationFilterOperators } from '@orz-people-platform/types';
+} from '@weave/types';
+import { relationFilterOperators } from '@weave/types';
 
 import { evaluateAvailableIf, parseAvailableIf } from './visible-if';
 

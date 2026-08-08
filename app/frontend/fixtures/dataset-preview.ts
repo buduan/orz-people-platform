@@ -9,7 +9,7 @@ import type {
   JsonObject,
   JsonValue,
   RelationCardinality,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   applyDatasetQuery,
   canonicalizeDatasetQuery,

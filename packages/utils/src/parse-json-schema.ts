@@ -1,6 +1,6 @@
-import type { JsonSchema, JsonSchemaObject } from '@orz-people-platform/types';
+import type { JsonSchema, JsonSchemaObject } from '@weave/types';
 
-export type { JsonSchema, JsonSchemaObject, JsonValue } from '@orz-people-platform/types';
+export type { JsonSchema, JsonSchemaObject, JsonValue } from '@weave/types';
 
 /**
  * Parses a JSON Schema document from a JSON string.

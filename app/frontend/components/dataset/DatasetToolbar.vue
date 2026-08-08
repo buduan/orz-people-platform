@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DatasetFieldDefinition } from '@orz-people-platform/types';
+import type { DatasetFieldDefinition } from '@weave/types';
 import { computed } from '#imports';
 import DatasetQueryPopover from './DatasetQueryPopover.vue';
 import type {

@@ -21,7 +21,7 @@ import {
   parseAvailableIf,
   resolveLocalizedText,
   validateFormSchemaExtensions,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 
 describe('shared Form Schema utilities', () => {
   it('canonicalizes and hashes equivalent JSON objects identically', async () => {

@@ -5,7 +5,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type { AuthenticatedActor } from '@weave/types';
 
 import { AuthSettingsService } from '../auth/auth-settings.service';
 import { SessionService } from '../auth/session.service';

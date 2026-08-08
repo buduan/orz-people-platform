@@ -13,6 +13,6 @@ export {
   hashDatasetQuery,
   isDatasetFieldGroupable,
   isDatasetQueryEmpty,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 
-export type { DatasetFilterOperatorOption } from '@orz-people-platform/utils';
+export type { DatasetFilterOperatorOption } from '@weave/utils';

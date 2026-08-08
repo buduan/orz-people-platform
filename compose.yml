@@ -1,4 +1,4 @@
-name: orz-people-platform
+name: weave
 
 services:
   frontend:
@@ -29,8 +29,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
-      JWT_ISSUER: ${JWT_ISSUER:-orz-people-platform}
-      JWT_AUDIENCE: ${JWT_AUDIENCE:-orz-people-platform-api}
+      JWT_ISSUER: ${JWT_ISSUER:-weave}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-weave-api}
       JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS}
       AUTH_HMAC_SECRET: ${AUTH_HMAC_SECRET}
       AUTH_REFRESH_TTL_SECONDS: ${AUTH_REFRESH_TTL_SECONDS}

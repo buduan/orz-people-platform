@@ -18,8 +18,8 @@ import type {
   PublishedFormDefinition,
   SubmitFormRequest,
   SubmitFormResult,
-} from '@orz-people-platform/types';
-import { resolveLocalizedText } from '@orz-people-platform/utils';
+} from '@weave/types';
+import { resolveLocalizedText } from '@weave/utils';
 
 import { useAuthStore } from '~/stores/auth';
 import { toApiError } from '~/utils/api';

@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import { BadRequestException, ConflictException, HttpStatus } from '@nestjs/common';
 
-import { apiStatuses } from '@orz-people-platform/types';
+import { apiStatuses } from '@weave/types';
 
 import { AuthService } from '../../src/auth/auth.service';
 

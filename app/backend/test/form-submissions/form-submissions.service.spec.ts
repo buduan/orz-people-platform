@@ -19,7 +19,7 @@ import {
   vi,
 } from 'vitest';
 
-import { checksumJson } from '@orz-people-platform/utils';
+import { checksumJson } from '@weave/utils';
 
 import { FormSubmissionsService } from '../../src/form-submissions/form-submissions.service';
 

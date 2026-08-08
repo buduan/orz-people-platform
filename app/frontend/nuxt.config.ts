@@ -10,10 +10,10 @@ export default defineNuxtConfig({
   devServer: { port: 6771 },
   alias: {
     '@': fileURLToPath(new URL('./', import.meta.url)),
-    '@orz-people-platform/types': fileURLToPath(
+    '@weave/types': fileURLToPath(
       new URL('../../packages/types/src/', import.meta.url),
     ),
-    '@orz-people-platform/utils': fileURLToPath(
+    '@weave/utils': fileURLToPath(
       new URL('../../packages/utils/src/', import.meta.url),
     ),
   },

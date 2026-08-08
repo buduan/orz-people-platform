@@ -16,7 +16,7 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 
-import type { AuthCompleted } from '@orz-people-platform/types';
+import type { AuthCompleted } from '@weave/types';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';

@@ -6,7 +6,7 @@ import type {
   DatasetWindowQueryRequest,
   DatasetWindowQueryResponse,
   DatasetWindowQueryScope,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import type {
   DatasetMetadataState,
   DatasetTableRow,

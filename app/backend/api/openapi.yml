@@ -755,7 +755,7 @@ components:
               properties:
                 service:
                   type: string
-                  example: orz-people-platform-backend
+                  example: weave-backend
                 status:
                   type: string
                   example: ok

@@ -8,7 +8,7 @@ import {
   shallowRef,
   watch,
 } from '#imports';
-import type { JsonValue } from '@orz-people-platform/types';
+import type { JsonValue } from '@weave/types';
 import {
   getChoiceOptions,
   getItemExtension,
@@ -17,7 +17,7 @@ import {
   getSchemaProperties,
   isItemVisible,
   resolveLocalizedText,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 import { useFormFieldEditing } from '~/composables/useFormFieldEditing';
 import {
   createRelationOptionRequest,

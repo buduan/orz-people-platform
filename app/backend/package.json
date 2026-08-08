@@ -1,5 +1,5 @@
 {
-  "name": "@orz-people-platform/backend",
+  "name": "@weave/backend",
   "version": "0.1.0",
   "private": true,
   "main": "dist/main.js",
@@ -11,7 +11,7 @@
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev --schema prisma/schema.prisma",
     "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema prisma/schema.prisma",
     "test": "vitest run",
-    "typecheck": "pnpm prisma:generate && pnpm --filter @orz-people-platform/types build && pnpm --filter @orz-people-platform/utils build && tsc --noEmit -p tsconfig.build.json"
+    "typecheck": "pnpm prisma:generate && pnpm --filter @weave/types build && pnpm --filter @weave/utils build && tsc --noEmit -p tsconfig.build.json"
   },
   "dependencies": {
     "@nestjs/common": "catalog:",
@@ -20,8 +20,8 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "catalog:",
     "@nestjs/swagger": "^11.4.6",
-    "@orz-people-platform/types": "workspace:*",
-    "@orz-people-platform/utils": "workspace:*",
+    "@weave/types": "workspace:*",
+    "@weave/utils": "workspace:*",
     "@prisma/client": "^6.19.0",
     "@simplewebauthn/server": "^13.3.2",
     "ajv": "^8.20.0",

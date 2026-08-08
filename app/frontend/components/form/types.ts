@@ -8,7 +8,7 @@ import type {
   FormRelationOption,
   JsonSchema,
   JsonValue,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 
 /** UInput / UTextarea 暴露的最小聚焦接口，供标题 / 描述内联编辑框使用。 */
 export interface FormFieldTitleInput {

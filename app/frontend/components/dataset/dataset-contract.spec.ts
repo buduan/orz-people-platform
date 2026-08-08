@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from 'vitest';
-import type { CreateDatasetRowRequest } from '@orz-people-platform/types';
+import type { CreateDatasetRowRequest } from '@weave/types';
 import type {
   DatasetCellCommitPayload,
   DatasetGroupSummary,

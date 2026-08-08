@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { DatasetCapabilities } from '@orz-people-platform/types';
+import type { DatasetCapabilities } from '@weave/types';
 import { datasetPreviewFields } from '~/fixtures/dataset-preview';
 import {
   createDatasetCellUpdateRequest,

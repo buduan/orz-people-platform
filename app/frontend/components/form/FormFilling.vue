@@ -11,11 +11,11 @@ import type {
   PublishedFormDefinition,
   SubmitFormRequest,
   SubmitFormResult,
-} from '@orz-people-platform/types';
+} from '@weave/types';
 import {
   createInitialFormState,
   resolveLocalizedText,
-} from '@orz-people-platform/utils';
+} from '@weave/utils';
 
 import {
   formatFormLocale,
