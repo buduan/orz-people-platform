@@ -14,9 +14,11 @@ function canonicalize(value: JsonValue): string {
   }
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`;
   return `{${Object.keys(value).sort().map((key) => {
-    const child = value[key];
-    if (child === undefined) throw new TypeError(`JSON object key ${key} has undefined value`);
-    return `${JSON.stringify(key)}:${canonicalize(child)}`;
+    const entryValue = value[key];
+    if (entryValue === undefined) {
+      throw new TypeError(`Missing JSON value for key "${key}"`);
+    }
+    return `${JSON.stringify(key)}:${canonicalize(entryValue)}`;
   }).join(',')}}`;
 }
 
