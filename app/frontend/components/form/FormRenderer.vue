@@ -11,17 +11,25 @@ import {
 import type { FormItemId, JsonSchema, JsonValue } from '@orz-people-platform/types';
 import { createInitialFormState, getSchemaProperties } from '@orz-people-platform/utils';
 import { useFormFieldEditingState } from '~/composables/useFormFieldEditing';
-import type { FormRenderContext, FormRenderMode } from './types';
+import {
+  formRenderContextKey,
+  type FormRenderContext,
+  type FormRenderMode,
+} from './types';
 
 const props = withDefaults(defineProps<{
   schema: JsonSchema;
   mode?: FormRenderMode;
   locale?: string;
   defaultLocale?: string;
+  errors?: Readonly<Record<FormItemId, string>>;
+  loadRelationOptions?: FormRenderContext['loadRelationOptions'];
 }>(), {
   mode: 'fill',
   locale: 'zh-CN',
   defaultLocale: 'zh-CN',
+  errors: () => ({}),
+  loadRelationOptions: undefined,
 });
 
 const state = defineModel<Record<FormItemId, JsonValue | undefined>>({
@@ -49,13 +57,15 @@ const properties = computed(() => getSchemaProperties(props.schema));
 
 const formContext = computed<FormRenderContext>(() => ({
   defaultLocale: props.defaultLocale,
+  errors: props.errors,
+  loadRelationOptions: props.loadRelationOptions,
   locale: props.locale,
   mode: props.mode,
   schema: props.schema,
   state: state.value,
 }));
 
-provide('formRenderContext', formContext);
+provide(formRenderContextKey, formContext);
 
 /** 首次挂载时若 state 为空，用 schema default 初始化。 */
 watch(

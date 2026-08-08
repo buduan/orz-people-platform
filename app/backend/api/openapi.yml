@@ -10,6 +10,7 @@ tags:
   - name: System
   - name: Authentication
   - name: Users
+  - name: Form filling
 paths:
   /health:
     get:
@@ -319,6 +320,122 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserEnvelope'
+  /forms/getPublishedForm/{formId}:
+    get:
+      tags: [Form filling]
+      summary: Get the active published Form definition by global Form ID
+      operationId: getPublishedForm
+      description: >-
+        Authentication is optional. If a Bearer token is supplied it must be valid;
+        authenticated update-subject callers may receive their actor-bound context.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      responses:
+        '200':
+          description: Minimal active published definition and current availability.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishedFormEnvelope'
+        '401':
+          description: A supplied Bearer token is invalid or no longer has a live Session.
+        '404':
+          description: The Form is missing, archived, or has no active published release.
+  /forms/getRelationOptions/{formId}/{itemId}:
+    get:
+      tags: [Form filling]
+      summary: Get safe dynamic options for a published relation item
+      operationId: getFormRelationOptions
+      security: []
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+        - name: values
+          in: query
+          description: JSON object containing current declared valueFrom dependencies.
+          schema:
+            type: string
+            maxLength: 20000
+        - name: take
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+      responses:
+        '200':
+          description: Opaque row IDs and display labels only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormRelationOptionsEnvelope'
+        '400':
+          description: Invalid values/take or the item is not a configured relation selector.
+        '404':
+          description: The published Form or item was not found.
+  /forms/submitForm:
+    post:
+      tags: [Form filling]
+      summary: Submit answers to a published Form
+      operationId: submitForm
+      description: >-
+        Authentication is optional. The operation revalidates availability, access,
+        Schema, Dataset mappings, relations and subject-row revision on the server.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitFormRequest'
+      responses:
+        '201':
+          description: Submission created or subject row updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitFormEnvelope'
+        '400':
+          description: Invalid DTO, Schema answers, hidden item, mapping, or idempotency key.
+        '401':
+          description: Authentication is required or a supplied Bearer token is invalid.
+        '404':
+          description: The published Form or required subject row was not found.
+        '409':
+          description: Closed state, stale revision, or conflicting idempotency payload.
+        '429':
+          description: The per-Form actor/network submission limit was exceeded.
 components:
   securitySchemes:
     bearerAuth:
@@ -703,6 +820,143 @@ components:
                 options:
                   type: object
                   additionalProperties: true
+    LocalizedText:
+      type: object
+      additionalProperties:
+        type: string
+    FormSubmissionContext:
+      type: object
+      required: [answers, expectedRevision]
+      additionalProperties: false
+      properties:
+        answers:
+          type: object
+          additionalProperties: true
+        expectedRevision:
+          type: integer
+          minimum: 1
+    PublishedForm:
+      type: object
+      required:
+        - id
+        - version
+        - defaultLocale
+        - nameI18n
+        - descriptionI18n
+        - closingMessageI18n
+        - opensAt
+        - closesAt
+        - submissionAccess
+        - writeMode
+        - schema
+        - acceptingSubmissions
+        - unavailableReason
+        - submissionContext
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        defaultLocale:
+          type: string
+        nameI18n:
+          $ref: '#/components/schemas/LocalizedText'
+        descriptionI18n:
+          oneOf:
+            - $ref: '#/components/schemas/LocalizedText'
+            - type: 'null'
+        closingMessageI18n:
+          oneOf:
+            - $ref: '#/components/schemas/LocalizedText'
+            - type: 'null'
+        opensAt:
+          type: [string, 'null']
+          format: date-time
+        closesAt:
+          type: [string, 'null']
+          format: date-time
+        submissionAccess:
+          type: string
+          enum: [anonymous_allowed, authentication_required]
+        writeMode:
+          type: string
+          enum: [create_row, update_subject_row]
+        schema:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: boolean
+        acceptingSubmissions:
+          type: boolean
+        unavailableReason:
+          type: [string, 'null']
+          enum: [not_started, closed, inactive, subject_row_missing, null]
+        submissionContext:
+          oneOf:
+            - $ref: '#/components/schemas/FormSubmissionContext'
+            - type: 'null'
+    PublishedFormEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PublishedForm'
+    FormRelationOption:
+      type: object
+      required: [id, label]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+    FormRelationOptionsEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/FormRelationOption'
+    SubmitFormRequest:
+      type: object
+      required: [formId, answers]
+      additionalProperties: false
+      properties:
+        formId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        answers:
+          type: object
+          additionalProperties: true
+        expectedRevision:
+          type: integer
+          minimum: 1
+    SubmitFormResult:
+      type: object
+      required: [submissionId, operation, submittedAt]
+      additionalProperties: false
+      properties:
+        submissionId:
+          type: string
+        operation:
+          type: string
+          enum: [created, updated]
+        submittedAt:
+          type: string
+          format: date-time
+    SubmitFormEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/SubmitFormResult'
     UserEnvelope:
       allOf:
         - $ref: '#/components/schemas/EnvelopeBase'

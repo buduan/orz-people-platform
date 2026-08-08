@@ -3,9 +3,11 @@ import { createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/com
 import type { AuthenticatedActor, PermissionKey } from '@orz-people-platform/types';
 
 export const IS_PUBLIC_KEY = 'isPublic';
+export const IS_OPTIONAL_AUTHENTICATION_KEY = 'isOptionalAuthentication';
 export const REQUIRED_PERMISSIONS_KEY = 'requiredPermissions';
 
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
+export const OptionalAuthentication = () => SetMetadata(IS_OPTIONAL_AUTHENTICATION_KEY, true);
 export const RequirePermissions = (...permissions: PermissionKey[]) => (
   SetMetadata(REQUIRED_PERMISSIONS_KEY, permissions)
 );

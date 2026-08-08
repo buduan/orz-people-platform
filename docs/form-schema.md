@@ -214,6 +214,34 @@ Item 扩展允许的键：
 
 服务端还会校验：关联目标不能是 `members` / `join_requests` 等不安全 Dataset；`labelFieldId` 与 filter 字段必须属于目标 Dataset、未归档、非系统托管。
 
+公开填写页只会为带 `options.labelFieldId` 的 relation item 请求动态选项。请求使用
+`GET /forms/getRelationOptions/:formId/:itemId`，其中 `formId` 是全局唯一的 `Form.id`；`values`
+query 是当前 `valueFrom` 依赖答案的 JSON 对象，`take` 范围为 1–100。响应只包含目标行的不透明
+ID 与字符串标签。前端仅监听 `getRelationFilterDependencies(filter)` 返回的依赖，忽略过期响应并
+清除不再存在的选项。
+
+## 公开填写与提交
+
+`/form/:id` 中的 `id` 是 `Form.id`，不是 slug。页面通过以下 API 复用当前已发布 Schema：
+
+| API | 认证 | 说明 |
+| --- | --- | --- |
+| `GET /forms/getPublishedForm/:formId` | 可选 Bearer | 返回最小 published 定义、开放状态及可选主体行上下文；不返回 draft、编辑锁、checksum 或管理 revision。 |
+| `GET /forms/getRelationOptions/:formId/:itemId` | 公开 | 按 published relation 配置返回安全选项。 |
+| `POST /forms/submitForm` | 可选 Bearer | 提交 `{ formId, answers, expectedRevision? }`，支持最长 128 字符的 `Idempotency-Key`。 |
+
+“可选 Bearer”表示不携带 header 时按匿名处理，携带 header 时必须完成完整 Session 校验；坏 token
+不会降级为匿名。`authentication_required` 和 `update_subject_row` 表单仍要求有效 actor。
+
+客户端先用 Ajv Draft 2020-12 校验当前可用答案，并把可定位错误映射到 item。服务端随后重新校验
+published/open 状态、`availableIf`、JSON Schema、Dataset 映射、relation 目标、特殊 Dataset 规则与
+CAS revision。客户端用 `filterVisibleAnswers` 排除隐藏值；服务端用
+`findUnavailableSubmittedItemIds` 拒绝主动注入的隐藏答案。
+
+`update_subject_row` 的预填值与 `expectedRevision` 只通过当前 actor 的 `DatasetRowSubject` 解析，
+客户端不能选择 row ID。成功响应仅包含 `submissionId`、`operation` 和 `submittedAt`；Dataset 行 ID
+不会暴露。相同幂等 key 与相同答案/版本返回已提交结果，key 复用于不同 payload 时返回冲突。
+
 ## 校验链路
 
 写入 Form 定义时，服务端按下列顺序校验：
@@ -223,7 +251,8 @@ Item 扩展允许的键：
 3. **平台扩展校验**：`validateFormSchemaExtensions(schema)`（item ID、`x-form` 结构、`availableIf`、capture、选项 i18n）。
 4. **业务校验**：Dataset 绑定、字段一对一映射、系统字段不可写、关联安全策略、特殊 Dataset 的登录/写入模式约束、capture 系统字段、`create_row` 下必填字段覆盖等。
 
-提交答案时，服务端再次用 AJV 按已发布 Schema 校验 payload，并完成规范化、幂等与写入。
+提交答案时，服务端再次用 AJV 按已发布 Schema 校验 payload，并完成可用性检查、规范化、Redis
+限频、幂等与事务写入。已成功提交的幂等重试会在消耗新写入限额之前恢复结果。
 
 ## 面板编辑与源码保存
 
@@ -260,6 +289,8 @@ token 和 `expectedRevision`。锁丢失后页面保留未保存内容但禁用�
 | `getChoiceOptions` | 从 `oneOf` 投影选项 |
 | `createInitialFormState` | 按 `default` 初始化 state |
 | `isItemVisible` | 基于 `availableIf` 判断是否可用 |
+| `filterVisibleAnswers` / `findUnavailableSubmittedItemIds` | 过滤当前可用答案 / 识别隐藏字段注入 |
+| `getRelationFilterDependencies` | 提取 relation filter 的 `valueFrom` item |
 | `parseAvailableIf` / `evaluateAvailableIf` | 严格解析与求值（非法结构抛 `TypeError`） |
 
 渲染层应直接按 `getSchemaProperties(schema)` 返回对象的键序渲染字段。

@@ -5,12 +5,14 @@ import {
   inject,
   nextTick,
   ref,
-  type Ref,
+  shallowRef,
+  watch,
 } from '#imports';
 import type { JsonValue } from '@orz-people-platform/types';
 import {
   getChoiceOptions,
   getItemExtension,
+  getRelationFilterDependencies,
   getRequiredItemIds,
   getSchemaProperties,
   isItemVisible,
@@ -18,14 +20,18 @@ import {
 } from '@orz-people-platform/utils';
 import { useFormFieldEditing } from '~/composables/useFormFieldEditing';
 import {
+  createRelationOptionRequest,
+  isLatestRelationRequest,
+} from '~/utils/form-relation-options';
+import {
   resolveFormComponent,
   resolveInputType,
   resolveWidgetName,
 } from './component-map';
 import type {
   FocusableInputInstance,
-  FormRenderContext,
 } from './types';
+import { formRenderContextKey } from './types';
 
 defineOptions({ name: 'FormField' });
 
@@ -53,7 +59,7 @@ const emit = defineEmits<{
   'update:description': [fieldId: string, value?: string];
 }>();
 
-const formContext = inject<Ref<FormRenderContext> | null>('formRenderContext', null);
+const formContext = inject(formRenderContextKey, null);
 
 const locale = computed(() => formContext?.value.locale ?? 'zh-CN');
 const defaultLocale = computed(() => formContext?.value.defaultLocale ?? 'zh-CN');
@@ -106,17 +112,98 @@ const placeholder = computed(() => (
   )
 ));
 
-const choiceOptions = computed(() => getChoiceOptions(
+const staticChoiceOptions = computed(() => getChoiceOptions(
   property.value,
   locale.value,
   defaultLocale.value,
 ));
+
+const relationDependencies = computed(() => getRelationFilterDependencies(
+  itemExtension.value?.ui?.options?.filter,
+));
+const hasRelationOptions = computed(() => (
+  typeof itemExtension.value?.ui?.options?.labelFieldId === 'string'
+  && Boolean(formContext?.value.loadRelationOptions)
+));
+const remoteChoiceOptions = shallowRef<Array<{ label: string; value: string }>>([]);
+const relationLoading = shallowRef(false);
+const relationError = shallowRef<string | null>(null);
+let latestRelationRequestId = 0;
+
+const relationRequest = computed(() => {
+  if (!hasRelationOptions.value || !visible.value) return null;
+  return createRelationOptionRequest(
+    props.fieldId,
+    relationDependencies.value,
+    state.value ?? {},
+  );
+});
+
+function discardUnavailableSelection(optionIds: ReadonlySet<string>): void {
+  if (!state.value) return;
+  const current = state.value[props.fieldId];
+  if (Array.isArray(current)) {
+    const next = current.filter((value) => typeof value === 'string' && optionIds.has(value));
+    if (next.length !== current.length) state.value[props.fieldId] = next;
+    return;
+  }
+  if (current !== undefined && (typeof current !== 'string' || !optionIds.has(current))) {
+    delete state.value[props.fieldId];
+  }
+}
+
+async function loadRemoteOptions(): Promise<void> {
+  const request = relationRequest.value;
+  const loader = formContext?.value.loadRelationOptions;
+  latestRelationRequestId += 1;
+  const requestId = latestRelationRequestId;
+  if (!request || !loader) {
+    remoteChoiceOptions.value = [];
+    relationLoading.value = false;
+    relationError.value = null;
+    return;
+  }
+  relationLoading.value = true;
+  relationError.value = null;
+  try {
+    const options = await loader(props.fieldId, request.values);
+    if (!isLatestRelationRequest(requestId, latestRelationRequestId)) return;
+    remoteChoiceOptions.value = options.map((option) => ({
+      label: option.label,
+      value: option.id,
+    }));
+    discardUnavailableSelection(new Set(options.map((option) => option.id)));
+  } catch {
+    if (!isLatestRelationRequest(requestId, latestRelationRequestId)) return;
+    remoteChoiceOptions.value = [];
+    relationError.value = '选项加载失败，请稍后重试';
+  } finally {
+    if (isLatestRelationRequest(requestId, latestRelationRequestId)) {
+      relationLoading.value = false;
+    }
+  }
+}
+
+watch(
+  [
+    () => relationRequest.value?.key,
+    () => formContext?.value.loadRelationOptions,
+  ],
+  () => { loadRemoteOptions(); },
+  { immediate: true },
+);
+
+const choiceOptions = computed(() => (
+  hasRelationOptions.value ? remoteChoiceOptions.value : staticChoiceOptions.value
+));
+const resolvedError = computed(() => props.error ?? formContext?.value.errors[props.fieldId]);
 
 const leafProps = computed(() => {
   const base: Record<string, unknown> = {
     placeholder: placeholder.value,
     required: fieldRequired.value,
     disabled: props.allowEdit,
+    'aria-label': resolvedTitle.value,
   };
   if (widgetName.value === 'input') {
     base.type = resolveInputType(property.value);
@@ -136,6 +223,11 @@ const leafProps = computed(() => {
     const prop = property.value as Record<string, unknown>;
     if (prop.type === 'array') base.multiple = true;
   }
+  if (widgetName.value === 'checkbox' && property.value) {
+    const prop = property.value as Record<string, unknown>;
+    base.boolean = prop.type === 'boolean' && choiceOptions.value.length === 0;
+  }
+  if (hasRelationOptions.value) base.disabled = props.allowEdit || relationLoading.value;
   return base;
 });
 
@@ -304,8 +396,9 @@ function emitDelete(): void { emit('delete', props.fieldId); }
       <div class="mt-3">
         <UFormField
           :name="fieldName"
+          :label="resolvedTitle"
           :required="fieldRequired"
-          :error="error"
+          :error="resolvedError"
           :ui="{
             label: 'sr-only',
             container: 'mt-0',
@@ -324,6 +417,27 @@ function emitDelete(): void { emit('delete', props.fieldId); }
             未知控件：{{ widgetName ?? '（未配置 widget）' }}
           </div>
         </UFormField>
+        <p
+          v-if="relationLoading"
+          class="mt-2 text-sm text-muted"
+          role="status"
+        >
+          正在加载选项…
+        </p>
+        <p
+          v-else-if="relationError"
+          class="mt-2 text-sm text-error"
+          role="alert"
+        >
+          {{ relationError }}
+        </p>
+        <p
+          v-else-if="hasRelationOptions && choiceOptions.length === 0"
+          class="mt-2 text-sm text-muted"
+          role="status"
+        >
+          暂无可用选项
+        </p>
       </div>
     </div>
 

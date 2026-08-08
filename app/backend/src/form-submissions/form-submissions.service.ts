@@ -14,6 +14,7 @@ import {
   FormStatus,
   FormSubmissionAccess,
   FormSubmissionOperation,
+  FormVersionState,
   FormWriteMode,
   JoinRequestStatus,
   Prisma,
@@ -21,8 +22,19 @@ import {
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 
-import type { AuthenticatedActor, JsonValue } from '@orz-people-platform/types';
-import { checksumJson } from '@orz-people-platform/utils';
+import type {
+  AuthenticatedActor,
+  FormSubmissionContext,
+  JsonSchema,
+  JsonValue,
+  SubmitFormResult,
+} from '@orz-people-platform/types';
+import {
+  checksumJson,
+  findUnavailableSubmittedItemIds,
+  getItemExtension,
+  getSchemaProperties,
+} from '@orz-people-platform/utils';
 
 import { AuditService } from '../audit/audit.service';
 import { RelationValidationService } from '../common/relation-validation.service';
@@ -31,9 +43,11 @@ import { DatasetSchemaService } from '../datasets/dataset-schema.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivitiesService } from '../special-datasets/activities.service';
 import type { SubmitFormInput } from './form-submission-input';
+import { FormSubmissionRateLimitService } from './form-submission-rate-limit.service';
 
 /** 请求元数据，用于设备信息采集。 */
 interface RequestMetadata {
+  networkIdentity?: string;
   userAgent?: string;
 }
 
@@ -73,6 +87,7 @@ export class FormSubmissionsService {
     private readonly activities: ActivitiesService,
     private readonly audit: AuditService,
     private readonly relationValidation: RelationValidationService,
+    private readonly rateLimit: FormSubmissionRateLimitService,
   ) {
     // useDefaults: true —— AJV 会在校验前自动填入 Schema 中声明的 default 值。
     this.ajv = new Ajv2020({
@@ -120,6 +135,97 @@ export class FormSubmissionsService {
     return this.submit(form, dto, idempotencyKey, actor, request);
   }
 
+  /** Public Form-ID submission entry, supporting an anonymous or authenticated actor. */
+  public async submitByPublicId(
+    formId: string,
+    dto: SubmitFormInput,
+    idempotencyKey: string | undefined,
+    actor: AuthenticatedActor | null,
+    request: RequestMetadata,
+  ): Promise<SubmitFormResult> {
+    const form = await this.prisma.form.findUnique({
+      where: { id: formId },
+      include: { activeVersion: true, dataset: true },
+    });
+    if (!form
+      || form.status === FormStatus.archived
+      || !form.activeVersion
+      || form.activeVersion.state !== FormVersionState.published) {
+      throw new NotFoundException('Published Form not found');
+    }
+    const result = await this.submit(
+      form,
+      dto,
+      idempotencyKey,
+      actor,
+      request,
+      actor ? `user:${actor.userId}` : `network:${request.networkIdentity ?? 'unknown'}`,
+    );
+    return {
+      submissionId: result.id,
+      operation: result.operation,
+      submittedAt: result.submittedAt.toISOString(),
+    };
+  }
+
+  /** Load the authenticated actor's current answers for an update-subject Form. */
+  public async getSubjectContext(
+    formId: string,
+    actor: AuthenticatedActor,
+  ): Promise<FormSubmissionContext | null> {
+    const form = await this.prisma.form.findUnique({
+      where: { id: formId },
+      include: { activeVersion: true },
+    });
+    if (!form
+      || form.status === FormStatus.archived
+      || !form.activeVersion
+      || form.activeVersion.state !== FormVersionState.published
+      || form.activeVersion.writeMode !== FormWriteMode.update_subject_row) return null;
+    const subject = await this.prisma.datasetRowSubject.findUnique({
+      where: { datasetId_userId: { datasetId: form.datasetId, userId: actor.userId } },
+      include: { row: { include: { sourceRelations: true } } },
+    });
+    if (!subject || subject.row.deletedAt) return null;
+
+    const properties = getSchemaProperties(form.activeVersion.schema as JsonSchema);
+    if (!properties) return null;
+    const mappedFields = Object.values(properties).flatMap((property) => {
+      const extension = getItemExtension(property);
+      return extension ? [extension.datasetFieldId] : [];
+    });
+    const fields = await this.prisma.datasetField.findMany({
+      where: { id: { in: mappedFields }, datasetId: form.datasetId },
+      select: { id: true, kind: true, relationCardinality: true },
+    });
+    const fieldsById = new Map(fields.map((field) => [field.id, field]));
+    const relations = new Map<string, string[]>();
+    [...subject.row.sourceRelations]
+      .sort((left, right) => left.position - right.position)
+      .forEach((relation) => relations.set(relation.fieldId, [
+        ...(relations.get(relation.fieldId) ?? []),
+        relation.targetRowId,
+      ]));
+    const rowValues = subject.row.values as Record<string, JsonValue>;
+    const answers: Record<string, JsonValue> = {};
+    Object.entries(properties).forEach(([itemId, property]) => {
+      const extension = getItemExtension(property);
+      if (!extension) return;
+      const field = fieldsById.get(extension.datasetFieldId);
+      if (!field) return;
+      if (field.kind === DatasetFieldKind.relation) {
+        const targets = relations.get(field.id) ?? [];
+        const [target] = targets;
+        if (field.relationCardinality === 'many') answers[itemId] = targets;
+        else if (target) answers[itemId] = target;
+        return;
+      }
+      const value = rowValues[field.id];
+      if (value !== undefined) answers[itemId] = value;
+    });
+    return { answers, expectedRevision: subject.row.revision };
+  }
+
   /**
    * 统一的提交入口。
    * 处理幂等、窗口校验、JSON Schema 验证、答案规范化、设备采集、
@@ -131,6 +237,7 @@ export class FormSubmissionsService {
     idempotencyKey: string | undefined,
     actor: AuthenticatedActor | null,
     request: RequestMetadata,
+    rateLimitIdentity?: string,
   ) {
     if (idempotencyKey && idempotencyKey.length > 128) {
       throw new BadRequestException('Idempotency-Key exceeds 128 characters');
@@ -149,6 +256,7 @@ export class FormSubmissionsService {
       payloadChecksum,
     );
     if (existing) return existing;
+    if (rateLimitIdentity) await this.rateLimit.consume(form.id, rateLimitIdentity);
 
     const version = form.activeVersion;
     if (!version || form.status !== FormStatus.active
@@ -175,6 +283,16 @@ export class FormSubmissionsService {
     }
 
     // ---- JSON Schema 验证 ----
+    const hiddenItemIds = findUnavailableSubmittedItemIds(
+      version.schema as JsonSchema,
+      dto.answers as Record<string, JsonValue | undefined>,
+    );
+    if (hiddenItemIds.length > 0) {
+      throw new BadRequestException({
+        message: 'Form answers contain unavailable items',
+        itemIds: hiddenItemIds,
+      });
+    }
     const answers = structuredClone(dto.answers);
     const validate = this.ajv.compile(version.schema as object);
     if (!validate(answers)) {
