@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from '#imports';
-import type { FormItemOption, FormItemOptionInput } from './types';
+import type {
+  FormItemOption,
+  FormItemOptionInput,
+} from './types';
 
 type CheckboxSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 type CheckboxColor = 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'error' | 'neutral';
@@ -9,6 +12,7 @@ type CheckboxVariant = 'list' | 'card' | 'table';
 
 interface CheckboxProps {
   items?: FormItemOptionInput[];
+  boolean?: boolean;
   legend?: string;
   disabled?: boolean;
   required?: boolean;
@@ -26,7 +30,17 @@ const props = withDefaults(defineProps<CheckboxProps>(), {
   size: 'md',
   color: 'primary',
 });
-const model = defineModel<string[]>({ default: () => [] });
+const model = defineModel<boolean | string[] | undefined>({ default: undefined });
+
+const booleanModel = computed<boolean>({
+  get: () => model.value === true,
+  set: (value) => { model.value = value; },
+});
+
+const groupModel = computed<string[]>({
+  get: () => (Array.isArray(model.value) ? model.value : []),
+  set: (value) => { model.value = value; },
+});
 
 const items = computed(() => props.items.map((item) => {
   if (typeof item !== 'object') return String(item);
@@ -36,8 +50,19 @@ const items = computed(() => props.items.map((item) => {
 </script>
 
 <template>
+  <UCheckbox
+    v-if="boolean"
+    v-model="booleanModel"
+    v-bind="$attrs"
+    :disabled="disabled"
+    :required="required"
+    :size="size"
+    :color="color"
+  />
+
   <UCheckboxGroup
-    v-model="model"
+    v-else
+    v-model="groupModel"
     v-bind="$attrs"
     class="w-full"
     :items="items"

@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui';
+import { computed } from '#imports';
 
 const props = withDefaults(defineProps<{
   title?: string;
   creatorName?: string;
+  dirty?: boolean;
+  disabled?: boolean;
+  lockLabel?: string;
+  publishing?: boolean;
+  saving?: boolean;
 }>(), {
   title: '未命名表单',
   creatorName: '未知创建人',
+  dirty: false,
+  disabled: false,
+  lockLabel: '正在连接编辑会话',
+  publishing: false,
+  saving: false,
 });
 
 const emit = defineEmits<{
@@ -16,24 +27,27 @@ const emit = defineEmits<{
   publish: [];
 }>();
 
-const actionItems: DropdownMenuItem[][] = [[
+const actionItems = computed<DropdownMenuItem[][]>(() => [[
   {
     label: '源码',
     icon: 'i-solar-code-bold-duotone',
+    disabled: props.disabled,
     onSelect: () => emit('source'),
   },
   {
     label: '保存',
     icon: 'i-solar-diskette-bold-duotone',
+    disabled: props.disabled || props.saving,
     onSelect: () => emit('save'),
   },
   {
     label: '发布',
     icon: 'i-solar-upload-bold-duotone',
     color: 'primary',
+    disabled: props.disabled || props.publishing,
     onSelect: () => emit('publish'),
   },
-]];
+]]);
 </script>
 
 <template>
@@ -58,12 +72,23 @@ const actionItems: DropdownMenuItem[][] = [[
         <h1 class="truncate text-base font-semibold tracking-tight text-highlighted sm:text-lg">
           {{ props.title }}
         </h1>
-        <p class="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted">
+        <p class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted">
           <UIcon
             name="i-solar-user-rounded-bold-duotone"
             class="size-4 shrink-0"
           />
           <span class="truncate">创建人：{{ props.creatorName }}</span>
+          <span aria-hidden="true">·</span>
+          <span :class="props.disabled ? 'text-warning' : 'text-success'">
+            {{ props.lockLabel }}
+          </span>
+          <UBadge
+            v-if="props.dirty"
+            label="未保存"
+            color="warning"
+            variant="subtle"
+            size="sm"
+          />
         </p>
       </div>
     </div>
@@ -74,6 +99,7 @@ const actionItems: DropdownMenuItem[][] = [[
         icon="i-solar-code-bold-duotone"
         color="neutral"
         variant="outline"
+        :disabled="props.disabled"
         class="rounded-xl active:translate-y-px"
         @click="emit('source')"
       />
@@ -82,6 +108,8 @@ const actionItems: DropdownMenuItem[][] = [[
         icon="i-solar-diskette-bold-duotone"
         color="neutral"
         variant="outline"
+        :disabled="props.disabled"
+        :loading="props.saving"
         class="rounded-xl active:translate-y-px"
         @click="emit('save')"
       />
@@ -89,6 +117,8 @@ const actionItems: DropdownMenuItem[][] = [[
         label="发布"
         icon="i-solar-upload-bold-duotone"
         color="primary"
+        :disabled="props.disabled"
+        :loading="props.publishing"
         class="rounded-xl active:translate-y-px"
         @click="emit('publish')"
       />

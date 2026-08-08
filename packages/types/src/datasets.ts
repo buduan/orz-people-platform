@@ -145,6 +145,11 @@ export interface DatasetDetailResponse {
   capabilities: DatasetCapabilities;
 }
 
+/** Form 面板兼容接口所需的 Dataset 详情。 */
+export interface DatasetPanelDetail extends DatasetSummary {
+  fields: DatasetFieldDefinition[];
+}
+
 /** Dataset 行数据（含合并后的关联关系）。 */
 export interface DatasetRowData {
   id: string;
@@ -292,6 +297,21 @@ export interface CreateDatasetFieldRequest {
   required?: boolean;
   relationTargetDatasetId?: string | null;
   relationCardinality?: RelationCardinality | null;
+  position?: number;
+}
+
+/** Form 编辑器兼容接口内创建 Dataset 字段的请求。 */
+export interface CreateDatasetPanelFieldRequest {
+  datasetId: string;
+  key: string;
+  name: string;
+  description?: string;
+  kind: DatasetFieldKind;
+  valueSchema: JsonSchema;
+  config: JsonObject;
+  required: boolean;
+  relationTargetDatasetId?: string;
+  relationCardinality?: RelationCardinality;
   position?: number;
 }
 

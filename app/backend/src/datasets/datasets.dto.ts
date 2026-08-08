@@ -149,6 +149,53 @@ export class CreateDatasetFieldDto {
   public position?: number;
 }
 
+/** Form 编辑器旧 action 路由的兼容请求；revision 由 Controller 读取当前详情后补入。 */
+export class CreateDatasetPanelFieldDto {
+  @IsString()
+  @MinLength(1)
+  public datasetId!: string;
+
+  @IsString()
+  @Matches(/^[a-z][a-z0-9_]*$/)
+  @MaxLength(64)
+  public key!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  public name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2_000)
+  public description?: string;
+
+  @IsEnum(DatasetFieldKind)
+  public kind!: DatasetFieldKind;
+
+  @IsDefined()
+  public valueSchema!: unknown;
+
+  @IsObject()
+  public config!: Record<string, unknown>;
+
+  @IsBoolean()
+  public required!: boolean;
+
+  @IsOptional()
+  @IsString()
+  public relationTargetDatasetId?: string;
+
+  @IsOptional()
+  @IsEnum(RelationCardinality)
+  public relationCardinality?: RelationCardinality;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  public position?: number;
+}
+
 export class UpdateDatasetFieldDto {
   @IsInt()
   @Min(1)

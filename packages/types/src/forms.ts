@@ -1,4 +1,4 @@
-import type { JsonSchema, JsonValue } from './json';
+import type { JsonSchema, JsonSchemaObject, JsonValue } from './json';
 
 /** 多语言文案映射，key 为 BCP 47 locale。 */
 export type LocalizedText = Record<string, string>;
@@ -155,6 +155,7 @@ export interface FormCaptureSettings {
 export interface FormRootExtension {
   capture: FormCaptureSettings;
   datasetId: string;
+  i18n?: FormItemI18n;
   version: 1;
 }
 
@@ -206,4 +207,158 @@ export interface FormSubmissionSummary {
   submitterUserId: string | null;
   operation: FormSubmissionOperation;
   submittedAt: string;
+}
+
+// ---- Public Form filling API ----
+
+/** Stable reasons why a published Form cannot currently accept submissions. */
+export const formAvailabilityReasons = [
+  'not_started',
+  'closed',
+  'inactive',
+  'subject_row_missing',
+] as const;
+export type FormAvailabilityReason = (typeof formAvailabilityReasons)[number];
+
+/** Actor-bound values used to update an existing subject row. */
+export interface FormSubmissionContext {
+  answers: Record<FormItemId, JsonValue>;
+  expectedRevision: number;
+}
+
+/** Minimal published Form definition safe for public filling. */
+export interface PublishedFormDefinition {
+  id: string;
+  version: number;
+  defaultLocale: string;
+  nameI18n: LocalizedText;
+  descriptionI18n: LocalizedText | null;
+  closingMessageI18n: LocalizedText | null;
+  opensAt: string | null;
+  closesAt: string | null;
+  submissionAccess: FormSubmissionAccess;
+  writeMode: FormWriteMode;
+  schema: JsonSchema;
+  acceptingSubmissions: boolean;
+  unavailableReason: FormAvailabilityReason | null;
+  submissionContext: FormSubmissionContext | null;
+}
+
+/** Public relation option; Dataset contents remain opaque. */
+export interface FormRelationOption {
+  id: string;
+  label: string;
+}
+
+/** Public submission request keyed by published Form item IDs. */
+export interface SubmitFormRequest {
+  formId: string;
+  answers: Record<FormItemId, JsonValue>;
+  expectedRevision?: number;
+}
+
+/** Minimal result returned by the public submission endpoint. */
+export interface SubmitFormResult {
+  submissionId: string;
+  operation: FormSubmissionOperation;
+  submittedAt: string;
+}
+
+// ---- Panel Form 管理 API ----
+
+/** 表单列表分区。main = active + closed。 */
+export const formListSections = ['main', 'archived', 'all'] as const;
+export type FormListSection = (typeof formListSections)[number];
+
+/** 面板中展示的 Form 创建人。 */
+export interface FormCreatorSummary {
+  id: string;
+  displayName: string;
+}
+
+/** Redis 编辑锁的安全摘要；不向非持有者暴露 token。 */
+export interface FormEditLockSummary {
+  locked: boolean;
+  holderUserId: string | null;
+  holderName: string | null;
+  lockedAt: string | null;
+}
+
+/** Form 面板列表项。 */
+export interface FormPanelSummary extends FormSummary {
+  title: string;
+  creator: FormCreatorSummary;
+  hasDraft: boolean;
+  hasRelease: boolean;
+  lock: FormEditLockSummary;
+}
+
+/** Form 面板详情，draft/release 均由现有版本状态推导。 */
+export interface FormPanelDetail extends FormSummary {
+  creator: FormCreatorSummary;
+  draft: FormVersionDefinition | null;
+  release: FormVersionDefinition | null;
+  lock: FormEditLockSummary;
+}
+
+/** 创建或保存 draft 时提交的完整版本定义。 */
+export interface FormDraftDefinitionInput {
+  defaultLocale: string;
+  nameI18n: LocalizedText;
+  descriptionI18n?: LocalizedText;
+  closingMessageI18n?: LocalizedText;
+  opensAt?: string;
+  closesAt?: string;
+  submissionAccess: FormSubmissionAccess;
+  writeMode: FormWriteMode;
+  schema: JsonSchemaObject;
+}
+
+export interface CreateFormRequest extends FormDraftDefinitionInput {
+  datasetId: string;
+  slug: string;
+}
+
+export interface CreateFormResult {
+  form: FormSummary;
+  draft: FormVersionDefinition;
+}
+
+export interface SaveFormDraftRequest extends FormDraftDefinitionInput {
+  formId: string;
+  expectedRevision: number;
+  lockToken: string;
+}
+
+export interface PublishFormRequest {
+  formId: string;
+  expectedRevision: number;
+  lockToken: string;
+}
+
+export interface ChangeFormStatusRequest {
+  formId: string;
+  expectedRevision: number;
+}
+
+export interface FormEditLockRequest {
+  formId: string;
+}
+
+export interface FormEditLockTokenRequest extends FormEditLockRequest {
+  token: string;
+}
+
+export interface AcquireFormEditLockResult {
+  expiresIn: number;
+  lock: FormEditLockSummary;
+  token: string;
+}
+
+export interface HeartbeatFormEditLockResult {
+  expiresIn: number;
+}
+
+export interface ReleaseFormEditLockResult {
+  released: true;
 }

@@ -42,6 +42,11 @@ const navigation: NavigationMenuItem[] = [
     to: '/panel/dataset',
   },
   {
+    label: 'Forms',
+    icon: 'i-solar-notes-bold-duotone',
+    to: '/panel/form',
+  },
+  {
     label: 'Administration',
     type: 'label',
   },

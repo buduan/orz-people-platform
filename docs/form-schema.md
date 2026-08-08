@@ -46,6 +46,7 @@ Form Schema 根对象必须满足：
   "x-form": {
     "version": 1,
     "datasetId": "ds_...",
+    "i18n": { "title": { "zh-CN": "成员资料" } },
     "capture": {}
   }
 }
@@ -103,13 +104,14 @@ q_<UUID v4>
 
 ## 根扩展 `x-form`
 
-根扩展只允许下列键，且均为必填结构：
+根扩展只允许下列键：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `version` | `1` | 扩展协议版本，当前固定为 `1`。 |
 | `datasetId` | string | 绑定的 Dataset ID，必须与 Form 所属 Dataset 一致。 |
 | `capture` | object | 设备信息采集；可为空对象。 |
+| `i18n` | object（可选） | 表单级 `title` / `description` / `placeholder` 多语言文案；编辑器会同步表单标题至 `i18n.title`。 |
 
 根扩展**不包含** `layout`。未知键（含历史 `layout`）会被 `validateFormSchemaExtensions` 拒绝。
 
@@ -132,7 +134,13 @@ Item 扩展允许的键：
 
 多语言 map 的 key 为 BCP 47 locale（如 `zh-CN`、`en`），value 为字符串，且 map 不能为空。
 
-`resolveLocalizedText(map, locale)` 的解析顺序：请求 locale → `zh-CN` → 第一个字符串值。
+`resolveLocalizedText(map, locale, defaultLocale)` 的解析顺序：当前 locale → Form 的
+`defaultLocale` → 第一条非空字符串。编辑器把 `defaultLocale` 作为稳定的第一语言；切换语言只
+改变当前编辑语言，不会重排或修改默认语言。
+
+新增语言使用 BCP 47 标识（例如 `en`、`en-US`），经
+`Intl.getCanonicalLocales` 规范化后写入表单标题 map。字段和选项翻译在用户实际编辑时惰性写入
+当前语言 key；缺失翻译仅在渲染时回退，不会覆盖其他语言。
 
 ### `ui`
 
@@ -206,6 +214,34 @@ Item 扩展允许的键：
 
 服务端还会校验：关联目标不能是 `members` / `join_requests` 等不安全 Dataset；`labelFieldId` 与 filter 字段必须属于目标 Dataset、未归档、非系统托管。
 
+公开填写页只会为带 `options.labelFieldId` 的 relation item 请求动态选项。请求使用
+`GET /forms/getRelationOptions/:formId/:itemId`，其中 `formId` 是全局唯一的 `Form.id`；`values`
+query 是当前 `valueFrom` 依赖答案的 JSON 对象，`take` 范围为 1–100。响应只包含目标行的不透明
+ID 与字符串标签。前端仅监听 `getRelationFilterDependencies(filter)` 返回的依赖，忽略过期响应并
+清除不再存在的选项。
+
+## 公开填写与提交
+
+`/form/:id` 中的 `id` 是 `Form.id`，不是 slug。页面通过以下 API 复用当前已发布 Schema：
+
+| API | 认证 | 说明 |
+| --- | --- | --- |
+| `GET /forms/getPublishedForm/:formId` | 可选 Bearer | 返回最小 published 定义、开放状态及可选主体行上下文；不返回 draft、编辑锁、checksum 或管理 revision。 |
+| `GET /forms/getRelationOptions/:formId/:itemId` | 公开 | 按 published relation 配置返回安全选项。 |
+| `POST /forms/submitForm` | 可选 Bearer | 提交 `{ formId, answers, expectedRevision? }`，支持最长 128 字符的 `Idempotency-Key`。 |
+
+“可选 Bearer”表示不携带 header 时按匿名处理，携带 header 时必须完成完整 Session 校验；坏 token
+不会降级为匿名。`authentication_required` 和 `update_subject_row` 表单仍要求有效 actor。
+
+客户端先用 Ajv Draft 2020-12 校验当前可用答案，并把可定位错误映射到 item。服务端随后重新校验
+published/open 状态、`availableIf`、JSON Schema、Dataset 映射、relation 目标、特殊 Dataset 规则与
+CAS revision。客户端用 `filterVisibleAnswers` 排除隐藏值；服务端用
+`findUnavailableSubmittedItemIds` 拒绝主动注入的隐藏答案。
+
+`update_subject_row` 的预填值与 `expectedRevision` 只通过当前 actor 的 `DatasetRowSubject` 解析，
+客户端不能选择 row ID。成功响应仅包含 `submissionId`、`operation` 和 `submittedAt`；Dataset 行 ID
+不会暴露。相同幂等 key 与相同答案/版本返回已提交结果，key 复用于不同 payload 时返回冲突。
+
 ## 校验链路
 
 写入 Form 定义时，服务端按下列顺序校验：
@@ -215,7 +251,21 @@ Item 扩展允许的键：
 3. **平台扩展校验**：`validateFormSchemaExtensions(schema)`（item ID、`x-form` 结构、`availableIf`、capture、选项 i18n）。
 4. **业务校验**：Dataset 绑定、字段一对一映射、系统字段不可写、关联安全策略、特殊 Dataset 的登录/写入模式约束、capture 系统字段、`create_row` 下必填字段覆盖等。
 
-提交答案时，服务端再次用 AJV 按已发布 Schema 校验 payload，并完成规范化、幂等与写入。
+提交答案时，服务端再次用 AJV 按已发布 Schema 校验 payload，并完成可用性检查、规范化、Redis
+限频、幂等与事务写入。已成功提交的幂等重试会在消耗新写入限额之前恢复结果。
+
+## 面板编辑与源码保存
+
+`/panel/form/:id` 将 `draft ?? release` 克隆为当前编辑会话唯一的 Schema/元数据状态。Palette、
+画布、Settings 和 Header 保存都修改或提交这一份状态，不存在另一份客户端 Form document。
+
+Header 的「源码」在 Nuxt UI Modal 中按需加载 Monaco。源码先经过 JSON 解析、根约束和共享
+`x-form` 校验，再通过 `saveFormDraft` 把完整 Schema 与版本元数据发送至后端；AJV、Dataset
+映射和业务校验仍以后端为准。解析、校验、revision 或编辑锁冲突都会保留 Modal 和源码文本，
+成功后才刷新本地 revision/checksum 并关闭。
+
+编辑页进入时通过 Redis 获取 90 秒独占锁，每 30 秒续租；保存与发布还必须同时携带匹配的锁
+token 和 `expectedRevision`。锁丢失后页面保留未保存内容但禁用所有 mutation，避免静默覆盖。
 
 共享包职责边界：
 
@@ -239,6 +289,8 @@ Item 扩展允许的键：
 | `getChoiceOptions` | 从 `oneOf` 投影选项 |
 | `createInitialFormState` | 按 `default` 初始化 state |
 | `isItemVisible` | 基于 `availableIf` 判断是否可用 |
+| `filterVisibleAnswers` / `findUnavailableSubmittedItemIds` | 过滤当前可用答案 / 识别隐藏字段注入 |
+| `getRelationFilterDependencies` | 提取 relation filter 的 `valueFrom` item |
 | `parseAvailableIf` / `evaluateAvailableIf` | 严格解析与求值（非法结构抛 `TypeError`） |
 
 渲染层应直接按 `getSchemaProperties(schema)` 返回对象的键序渲染字段。

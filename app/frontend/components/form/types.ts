@@ -1,6 +1,11 @@
-import type { ComponentPublicInstance } from 'vue';
+import type {
+  ComponentPublicInstance,
+  ComputedRef,
+  InjectionKey,
+} from 'vue';
 import type {
   FormItemId,
+  FormRelationOption,
   JsonSchema,
   JsonValue,
 } from '@orz-people-platform/types';
@@ -22,10 +27,20 @@ export type FormRenderMode = 'edit' | 'fill';
 
 /** FormRenderer → FormField 的共享上下文。 */
 export interface FormRenderContext {
+  defaultLocale: string;
+  errors: Readonly<Record<FormItemId, string>>;
+  loadRelationOptions?: (
+    itemId: FormItemId,
+    answers: Readonly<Record<FormItemId, JsonValue>>,
+  ) => Promise<FormRelationOption[]>;
   locale: string;
   mode: FormRenderMode;
   schema: JsonSchema;
   state: Record<FormItemId, JsonValue | undefined>;
 }
+
+export const formRenderContextKey: InjectionKey<ComputedRef<FormRenderContext>> = Symbol(
+  'form-render-context',
+);
 
 export type { FormItemId, JsonSchema, JsonValue };

@@ -20,7 +20,9 @@ export interface CreateRowVersionParams {
  * 的数据转换，消除各 Service 中的重复构造逻辑。
  */
 export function createRowVersion(params: CreateRowVersionParams) {
-  const { tx, rowId, version, operation, values, relations, actorUserId } = params;
+  const {
+    tx, rowId, version, operation, values, relations, actorUserId,
+  } = params;
   return tx.datasetRowVersion.create({
     data: {
       rowId,

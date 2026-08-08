@@ -10,8 +10,11 @@ import {
   createFormItemId,
   createInitialFormState,
   evaluateAvailableIf,
+  filterVisibleAnswers,
+  findUnavailableSubmittedItemIds,
   getChoiceOptions,
   getItemExtension,
+  getRelationFilterDependencies,
   getRequiredItemIds,
   getRootExtension,
   isItemVisible,
@@ -181,6 +184,11 @@ describe('shared Form Schema utilities', () => {
 
     expect(resolveLocalizedText({ en: 'Hello', 'zh-CN': '你好' }, 'en')).toBe('Hello');
     expect(resolveLocalizedText({ en: 'Hello' }, 'zh-CN')).toBe('Hello');
+    expect(resolveLocalizedText(
+      { en: 'Hello', fr: '', 'zh-CN': '你好' },
+      'fr',
+      'en',
+    )).toBe('Hello');
     expect(getRootExtension(schema)?.datasetId).toBe('ds_1');
     expect(getItemExtension(schema.properties[itemId])?.ui?.widget).toBe('radio');
     expect(getRequiredItemIds(schema).has(itemId)).toBe(true);
@@ -188,9 +196,67 @@ describe('shared Form Schema utilities', () => {
       { label: '研发', value: 'engineering' },
       { label: 'design', value: 'design' },
     ]);
+    expect(getChoiceOptions(schema.properties[itemId], 'fr', 'en')).toEqual([
+      { label: 'Eng', value: 'engineering' },
+      { label: 'design', value: 'design' },
+    ]);
     expect(createInitialFormState(schema)).toEqual({ [itemId]: 'engineering' });
     expect(isItemVisible(getItemExtension(schema.properties[itemId]), { [itemId]: 'x' })).toBe(true);
     expect(isItemVisible(getItemExtension(schema.properties[itemId]), {})).toBe(false);
     expect(getRootExtension(true)).toBeNull();
+  });
+
+  it('filters unavailable answers and reports injected hidden items', () => {
+    const controllingId = 'q_00000000-0000-4000-8000-000000000001';
+    const dependentId = 'q_00000000-0000-4000-8000-000000000002';
+    const schema = {
+      type: 'object',
+      properties: {
+        [controllingId]: {
+          type: 'boolean',
+          'x-form': { datasetFieldId: 'enabled' },
+        },
+        [dependentId]: {
+          type: 'string',
+          'x-form': {
+            datasetFieldId: 'detail',
+            availableIf: {
+              fieldId: controllingId,
+              operator: 'equals',
+              value: true,
+            },
+          },
+        },
+      },
+    };
+
+    expect(filterVisibleAnswers(schema, {
+      [controllingId]: false,
+      [dependentId]: 'hidden value',
+      q_unknown: 'ignored',
+    })).toEqual({ [controllingId]: false });
+    expect(findUnavailableSubmittedItemIds(schema, {
+      [controllingId]: false,
+      [dependentId]: 'hidden value',
+    })).toEqual([dependentId]);
+    expect(filterVisibleAnswers(schema, {
+      [controllingId]: true,
+      [dependentId]: 'visible value',
+    })).toEqual({
+      [controllingId]: true,
+      [dependentId]: 'visible value',
+    });
+  });
+
+  it('extracts unique relation valueFrom dependencies in declaration order', () => {
+    expect(getRelationFilterDependencies({
+      all: [
+        { fieldId: 'country', operator: 'equals', valueFrom: 'q_country' },
+        { fieldId: 'region', operator: 'equals', valueFrom: 'q_region' },
+        { fieldId: 'country_copy', operator: 'equals', valueFrom: 'q_country' },
+        { fieldId: 'active', operator: 'equals', value: true },
+      ],
+    })).toEqual(['q_country', 'q_region']);
+    expect(getRelationFilterDependencies(undefined)).toEqual([]);
   });
 });

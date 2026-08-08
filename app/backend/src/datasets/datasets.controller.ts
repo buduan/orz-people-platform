@@ -13,6 +13,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
   AuthenticatedActor,
+  DatasetFieldDefinition,
+  DatasetPanelDetail,
+  DatasetSummary,
   DatasetWindowQueryRequest,
 } from '@orz-people-platform/types';
 
@@ -22,6 +25,7 @@ import {
   ArchiveDatasetFieldDto,
   CreateDatasetDto,
   CreateDatasetFieldDto,
+  CreateDatasetPanelFieldDto,
   DatasetRelationOptionsDto,
   DatasetRevisionDto,
   DatasetRowValuesDto,
@@ -58,6 +62,45 @@ export class DatasetsController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     return this.datasets.create(workspaceId, dto, actor);
+  }
+
+  @Get('listDatasets')
+  @ApiOperation({ summary: 'List Datasets for the Form editor compatibility API' })
+  public async listDatasets(
+    @Param('workspaceId', ParseIntPipe) workspaceId: number,
+      @CurrentActor() actor: AuthenticatedActor,
+  ): Promise<DatasetSummary[]> {
+    const response = await this.datasets.list(workspaceId, actor);
+    return response.items.map(({ creator: _creator, capabilities: _capabilities, ...dataset }) => (
+      dataset
+    ));
+  }
+
+  @Get('getDataset/:datasetId')
+  @ApiOperation({ summary: 'Get Dataset fields for the Form editor compatibility API' })
+  public async getDataset(
+    @Param('workspaceId', ParseIntPipe) workspaceId: number,
+      @Param('datasetId') datasetId: string,
+      @CurrentActor() actor: AuthenticatedActor,
+  ): Promise<DatasetPanelDetail> {
+    const detail = await this.datasets.get(workspaceId, datasetId, actor);
+    return { ...detail.dataset, fields: detail.fields };
+  }
+
+  @Post('createDatasetField')
+  @ApiOperation({ summary: 'Create a Dataset field for the Form editor compatibility API' })
+  public async createDatasetField(
+    @Param('workspaceId', ParseIntPipe) workspaceId: number,
+      @Body() dto: CreateDatasetPanelFieldDto,
+      @CurrentActor() actor: AuthenticatedActor,
+  ): Promise<DatasetFieldDefinition> {
+    const { datasetId, ...definition } = dto;
+    const detail = await this.datasets.get(workspaceId, datasetId, actor);
+    const result = await this.datasets.createField(workspaceId, datasetId, {
+      ...definition,
+      expectedDatasetRevision: detail.dataset.revision,
+    }, actor);
+    return result.field;
   }
 
   @Get(':datasetId')
