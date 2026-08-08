@@ -6,6 +6,7 @@ import {
 } from 'vitest';
 import type { DatasetTableRow } from '~/components/dataset/types';
 import {
+  canonicalizeDatasetPreviewQuery,
   createDatasetPreviewRows,
   DATASET_PREVIEW_FIELD_COUNT,
   DATASET_PREVIEW_ROW_COUNT,
@@ -38,6 +39,30 @@ describe('Dataset preview Window Query', () => {
     expect(response.totalRowCount).toBe(5_000);
     expect(response.startIndex).toBe(4_950);
     expect(response.items).toHaveLength(50);
+  });
+
+  it('produces the same canonical form and fingerprint for equivalent object-key order', () => {
+    const first = {
+      filters: [{
+        id: 'metadata',
+        fieldId: 'field-metadata',
+        operator: 'equals' as const,
+        value: { source: 'preview', sequence: 1 },
+      }],
+      sorts: [],
+      group: null,
+    };
+    const second = {
+      ...first,
+      filters: [{
+        ...first.filters[0]!,
+        value: { sequence: 1, source: 'preview' },
+      }],
+    };
+
+    expect(canonicalizeDatasetPreviewQuery(first)).toBe(canonicalizeDatasetPreviewQuery(second));
+    expect(getDatasetPreviewQueryFingerprint(first))
+      .toBe(getDatasetPreviewQueryFingerprint(second));
   });
 
   it('builds one complete contiguous directory with full-result aggregates', async () => {

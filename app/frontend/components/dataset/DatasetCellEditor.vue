@@ -1,22 +1,30 @@
 <script setup lang="ts">
 import type { DatasetFieldDefinition, JsonValue } from '@orz-people-platform/types';
-import { useDocumentVisibility } from '@vueuse/core';
+import { useDocumentVisibility, watchDebounced } from '@vueuse/core';
 import { computed, shallowRef, watch } from '#imports';
+import { parseDatasetFieldInputValue } from '@orz-people-platform/utils';
 import { getDatasetCellFinalizeActions } from './dataset-cell';
 import { getDatasetFieldOptions } from './dataset-query';
-import type { DatasetCellDraftState, DatasetOption } from './types';
+import type {
+  DatasetCellDraftState,
+  DatasetOption,
+  DatasetRelationOptionsRequest,
+  DatasetRelationOptionState,
+} from './types';
 
 const props = defineProps<{
   rowId: string;
   field: DatasetFieldDefinition;
   value: JsonValue;
   relationOptions?: Record<string, DatasetOption[]>;
+  relationOptionState?: DatasetRelationOptionState;
 }>();
 
 const emit = defineEmits<{
   draftChange: [state: DatasetCellDraftState];
   commit: [value: JsonValue];
   release: [];
+  relationOptionsRequest: [request: Omit<DatasetRelationOptionsRequest, 'fieldId'>];
 }>();
 
 type DraftValue = boolean | string | string[];
@@ -33,46 +41,11 @@ function toDraftValue(value: JsonValue): DraftValue {
   return value === null ? '' : String(value);
 }
 
-function parseDraftValue(value: DraftValue): { value: JsonValue; valid: boolean } {
-  if (props.field.kind === 'boolean') {
-    return { value: value === true, valid: true };
-  }
-
-  if (props.field.kind === 'number') {
-    if (value === '') return { value: null, valid: !props.field.required };
-    const numericValue = Number(value);
-    return {
-      value: Number.isNaN(numericValue) ? null : numericValue,
-      valid: !Number.isNaN(numericValue),
-    };
-  }
-
-  if (props.field.kind === 'multi_select'
-    || (props.field.kind === 'relation' && props.field.relationCardinality === 'many')) {
-    const values = Array.isArray(value) ? value : [];
-    return { value: values, valid: !props.field.required || values.length > 0 };
-  }
-
-  if (props.field.kind === 'json') {
-    if (value === '') return { value: null, valid: !props.field.required };
-    try {
-      return { value: JSON.parse(String(value)) as JsonValue, valid: true };
-    } catch {
-      return { value: null, valid: false };
-    }
-  }
-
-  const stringValue = String(value);
-  return {
-    value: stringValue === '' ? null : stringValue,
-    valid: !props.field.required || stringValue.length > 0,
-  };
-}
-
 const documentVisibility = useDocumentVisibility();
 const finalized = shallowRef(false);
 const selectOpen = shallowRef(false);
 const blurredWhileSelectOpen = shallowRef(false);
+const relationSearch = shallowRef('');
 const draft = shallowRef<DraftValue>(toDraftValue(props.value));
 
 const options = computed(() => getDatasetFieldOptions(
@@ -96,7 +69,7 @@ const inputType = computed(() => {
   if (props.field.kind === 'url') return 'url';
   return 'text';
 });
-const parsedDraft = computed(() => parseDraftValue(draft.value));
+const parsedDraft = computed(() => parseDatasetFieldInputValue(props.field, draft.value));
 const changed = computed(() => JSON.stringify(parsedDraft.value.value)
   !== JSON.stringify(props.value));
 
@@ -106,6 +79,21 @@ function finalize(): void {
   getDatasetCellFinalizeActions(changed.value, parsedDraft.value.valid).forEach((action) => {
     if (action === 'commit') emit('commit', parsedDraft.value.value);
     if (action === 'release') emit('release');
+  });
+}
+
+function selectedRelationIds(): string[] {
+  const { value } = selectDraft;
+  if (Array.isArray(value)) return value;
+  if (value) return [value];
+  return [];
+}
+
+function requestRelationOptions(search = relationSearch.value, cursor?: string): void {
+  emit('relationOptionsRequest', {
+    search,
+    cursor,
+    selectedIds: selectedRelationIds(),
   });
 }
 
@@ -124,11 +112,16 @@ watch(documentVisibility, (visibility) => {
 });
 
 watch(selectOpen, (isOpen) => {
+  if (isOpen && props.field.kind === 'relation') requestRelationOptions();
   if (!isOpen && blurredWhileSelectOpen.value) {
     blurredWhileSelectOpen.value = false;
     finalize();
   }
 });
+
+watchDebounced(relationSearch, (search) => {
+  if (selectOpen.value && props.field.kind === 'relation') requestRelationOptions(search);
+}, { debounce: 250 });
 
 function updateDraft(value: unknown): void {
   if (Array.isArray(value)) {
@@ -153,6 +146,10 @@ function cancel(): void {
   finalized.value = true;
   emit('release');
 }
+
+watch(() => props.relationOptionState?.forbidden, (forbidden) => {
+  if (forbidden) cancel();
+});
 </script>
 
 <template>
@@ -190,6 +187,50 @@ function cancel(): void {
       @blur="handleBlur"
       @keydown.enter.stop.prevent="finalize"
     />
+
+    <USelectMenu
+      v-else-if="isSelectEditor && field.kind === 'relation'"
+      v-model:open="selectOpen"
+      :model-value="selectDraft"
+      :items="options"
+      value-key="value"
+      :multiple="isMultiple"
+      :search-term="relationSearch"
+      :search-input="{ placeholder: '搜索关联数据' }"
+      ignore-filter
+      autofocus
+      variant="none"
+      class="w-full"
+      aria-label="编辑单元格"
+      :loading="relationOptionState?.status === 'loading'"
+      @update:model-value="updateDraft"
+      @update:search-term="relationSearch = $event"
+      @blur="handleBlur"
+      @keydown.enter.stop="selectOpen = true"
+    >
+      <template #empty>
+        <span class="px-2 py-1 text-xs text-slate-500">
+          {{ relationOptionState?.status === 'loading' ? '正在加载…' : '没有匹配项' }}
+        </span>
+      </template>
+      <template
+        v-if="relationOptionState?.nextCursor"
+        #content-bottom
+      >
+        <UButton
+          label="加载更多"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          block
+          :loading="relationOptionState.status === 'loading'"
+          @click.stop="requestRelationOptions(
+            relationOptionState.search,
+            relationOptionState.nextCursor ?? undefined,
+          )"
+        />
+      </template>
+    </USelectMenu>
 
     <USelect
       v-else-if="isSelectEditor"

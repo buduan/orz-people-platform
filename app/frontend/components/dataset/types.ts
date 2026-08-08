@@ -1,11 +1,30 @@
 import type {
+  DatasetGroupSummary,
+  DatasetOption,
+  DatasetQueryKind,
+  DatasetRowRange,
   DatasetFieldDefinition,
   DatasetRowData,
   DatasetSummary,
+  DatasetTableQuery,
   JsonValue,
 } from '@orz-people-platform/types';
 
-export type DatasetQueryKind = 'filter' | 'sort' | 'group';
+export type {
+  DatasetAggregateOperation,
+  DatasetAggregateRule,
+  DatasetFilterOperator,
+  DatasetFilterRule,
+  DatasetGroupRule,
+  DatasetGroupSummary,
+  DatasetOption,
+  DatasetQueryKind,
+  DatasetRowRange,
+  DatasetSortRule,
+  DatasetTableQuery,
+  DatasetWindowQueryRequest,
+  DatasetWindowQueryResponse,
+} from '@orz-people-platform/types';
 
 export interface DatasetQueryOpenRequest {
   id: number;
@@ -13,94 +32,13 @@ export interface DatasetQueryOpenRequest {
   fieldId: string;
 }
 
-export type DatasetFilterOperator =
-  | 'contains'
-  | 'equals'
-  | 'not_equals'
-  | 'gt'
-  | 'gte'
-  | 'lt'
-  | 'lte'
-  | 'is_empty'
-  | 'is_not_empty'
-  | 'contains_any'
-  | 'contains_all'
-  | 'not_contains';
-
-export interface DatasetFilterRule {
-  id: string;
-  fieldId: string;
-  operator: DatasetFilterOperator;
-  value?: JsonValue;
-}
-
-export interface DatasetSortRule {
-  id: string;
-  fieldId: string;
-  direction: 'asc' | 'desc';
-}
-
-export type DatasetAggregateOperation =
-  | 'sum'
-  | 'avg'
-  | 'min'
-  | 'max'
-  | 'count_non_empty';
-
-export interface DatasetAggregateRule {
-  id: string;
-  fieldId: string;
-  operation: DatasetAggregateOperation;
-}
-
-export interface DatasetGroupRule {
-  fieldId: string;
-  aggregates: DatasetAggregateRule[];
-}
-
-export interface DatasetTableQuery {
-  filters: DatasetFilterRule[];
-  sorts: DatasetSortRule[];
-  group: DatasetGroupRule | null;
-}
-
 export type DatasetTableRow = DatasetRowData;
-
-export interface DatasetGroupSummary {
-  groupId: string;
-  groupKey: JsonValue | null;
-  startRowIndex: number;
-  rowCount: number;
-  aggregates: Record<string, JsonValue>;
-}
-
-export interface DatasetRowRange {
-  startIndex: number;
-  endIndex: number;
-}
 
 export interface DatasetWindowState {
   offset: number;
   limit: number;
   status: 'loading' | 'success' | 'error';
   error?: string;
-}
-
-export interface DatasetWindowQueryRequest {
-  query: DatasetTableQuery;
-  window: {
-    offset: number;
-    limit: number;
-  };
-  includeGroupDirectory?: boolean;
-}
-
-export interface DatasetWindowQueryResponse {
-  queryFingerprint: string;
-  totalRowCount: number;
-  startIndex: number;
-  items: DatasetTableRow[];
-  groups?: DatasetGroupSummary[];
 }
 
 export interface DatasetMetadataState {
@@ -113,9 +51,19 @@ export interface DatasetMutationState extends DatasetCellCoordinates {
   message?: string;
 }
 
-export interface DatasetOption {
-  label: string;
-  value: string;
+export interface DatasetRelationOptionState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error?: string;
+  forbidden?: boolean;
+  search?: string;
+  nextCursor?: string | null;
+}
+
+export interface DatasetRelationOptionsRequest {
+  fieldId: string;
+  search?: string;
+  cursor?: string;
+  selectedIds?: string[];
 }
 
 export interface DatasetCellLockState {
@@ -200,8 +148,12 @@ export interface DatasetTableProps {
   selection?: DatasetSelection;
   locks?: DatasetCellLockState[];
   relationOptions?: Record<string, DatasetOption[]>;
+  relationOptionStates?: Record<string, DatasetRelationOptionState>;
   rowActions?: DatasetRowAction[];
   readonlyCellKeys?: string[];
+  readonlyFieldIds?: string[];
+  canManageFields?: boolean;
+  canCreateRows?: boolean;
   readonly?: boolean;
 }
 
@@ -217,6 +169,7 @@ export interface DatasetTableEmits {
   'toggle-group': [payload: DatasetToggleGroupPayload];
   'window-range-request': [ranges: DatasetRowRange[]];
   'visible-range-change': [range: DatasetVisibleRange];
+  'relation-options-request': [request: DatasetRelationOptionsRequest];
 }
 
 export interface DatasetCellDraftState extends DatasetCellCoordinates {

@@ -3,7 +3,9 @@ import {
   DATASET_WINDOW_SIZE,
   getDatasetWindowOffsets,
   getDatasetWindowQueryKey,
+  replaceLoadedDatasetRow,
 } from '~/components/dataset/dataset-window';
+import { createDatasetPreviewRow } from '~/fixtures/dataset-preview';
 
 describe('Dataset absolute window planning', () => {
   it('deduplicates overlapping ranges and adds at most one adjacent prefetch', () => {
@@ -41,5 +43,12 @@ describe('Dataset absolute window planning', () => {
       4_500,
       50,
     ]);
+  });
+
+  it('replaces only an already-loaded row without changing absolute indexes', () => {
+    const row = createDatasetPreviewRow(12);
+    const updated = { ...row, revision: 2 };
+    expect(replaceLoadedDatasetRow({ 4_512: row }, updated)).toEqual({ 4_512: updated });
+    expect(replaceLoadedDatasetRow({ 4_512: row }, createDatasetPreviewRow(13))).toBeNull();
   });
 });

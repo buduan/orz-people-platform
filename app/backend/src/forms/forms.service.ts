@@ -80,7 +80,7 @@ export class FormsService {
     }
     const datasets = await this.datasets.list(workspaceId, actor);
     return this.prisma.form.findMany({
-      where: { workspaceId, datasetId: { in: datasets.map((dataset) => dataset.id) } },
+      where: { workspaceId, datasetId: { in: datasets.items.map((dataset) => dataset.id) } },
       include: { activeVersion: true },
       orderBy: { createdAt: 'desc' },
     });

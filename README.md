@@ -8,7 +8,7 @@ Weave 是一个面向 Workspace 的人员与组织数据平台原型，基于数
 
 ## 当前能力
 
-当前版本已经可以运行认证和管理类 API，但前端业务页面与 Dataset/Form 的 HTTP API 仍在建设中。下面的文档以仓库当前代码为准，不把 OpenSpec 设计或预留导航当作已完成能力。
+当前版本已经可以运行认证、管理和 Dataset API，并提供数据表列表与编辑页面。Form HTTP API 与业务编辑能力仍在建设中。下面的文档以仓库当前代码为准，不把 OpenSpec 设计或预留导航当作已完成能力。
 
 项目当前能力、实现边界和未暴露的内部领域服务，详见 [`docs/current-capabilities.md`](docs/current-capabilities.md)。
 
@@ -201,8 +201,11 @@ pnpm start
 | `/workspaces/:workspaceId/roles` | 角色、角色权限、成员角色和直接权限 |
 | `/system-administrators` | 系统管理员授予、撤销和查询 |
 | `/audit-logs` | 受权限保护的审计查询 |
+| `/workspaces/:workspaceId/datasets` | Dataset 列表、创建、详情、元数据与归档 |
+| `/workspaces/:workspaceId/datasets/:datasetId/fields/*` | 字段定义和关联目标选项 |
+| `/workspaces/:workspaceId/datasets/:datasetId/rows/*` | 绝对窗口查询、行创建、局部更新和软删除 |
 
-运行中的 Swagger 文档由 NestJS 根据当前 Controller 生成。`app/backend/api/openapi.yml` 是仓库中的静态契约文件；Dataset/Form 领域模块目前没有 HTTP Controller，因此不应从该文件推断出完整的领域 API。
+运行中的 Swagger 文档由 NestJS 根据当前 Controller 生成。`app/backend/api/openapi.yml` 是仓库中的静态契约文件，包含 Dataset HTTP 边界；Form 领域目前仍没有 HTTP Controller。
 
 ## 认证与安全模型
 
@@ -243,7 +246,7 @@ pnpm --filter @orz-people-platform/backend test
 pnpm --filter @orz-people-platform/frontend exec vitest run
 ```
 
-测试覆盖认证安全策略、OTP/MFA/Session、权限解析、Workspace 边界、Dataset/Form 服务、特殊 Dataset 事务、统一 API 响应、Pinia Token 状态和前端 API 错误处理。
+测试覆盖认证安全策略、OTP/MFA/Session、权限解析、Workspace 边界、Dataset HTTP DTO/能力/窗口/关联选项、Dataset/Form 服务、特殊 Dataset 事务、统一 API 响应、Pinia Token 状态、Dataset 前端查询适配和 API 错误处理。
 
 ## 开发约定
 

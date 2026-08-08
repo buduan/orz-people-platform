@@ -39,6 +39,7 @@ export interface AddDatasetCollaboratorInput {
 
 /** 创建 Dataset 字段（逻辑列）的入参。 */
 export interface CreateDatasetFieldInput {
+  expectedDatasetRevision: number;
   key: string;
   name: string;
   description?: string;
@@ -56,15 +57,20 @@ export interface CreateDatasetFieldInput {
 
 /** 更新 Dataset 字段的入参，携带乐观锁版本号。 */
 export interface UpdateDatasetFieldInput {
-  /** 调用方必须传入字段上次读取到的 revision。 */
-  expectedRevision: number;
-  key?: string;
+  /** 调用方必须同时传入 Dataset 和字段上次读取到的 revision。 */
+  expectedDatasetRevision: number;
+  expectedFieldRevision: number;
   name?: string;
   description?: string;
   valueSchema?: unknown;
   config?: Record<string, unknown>;
   required?: boolean;
   position?: number;
+}
+
+export interface ArchiveDatasetFieldInput {
+  expectedDatasetRevision: number;
+  expectedFieldRevision: number;
 }
 
 // ---- 数据行 ----

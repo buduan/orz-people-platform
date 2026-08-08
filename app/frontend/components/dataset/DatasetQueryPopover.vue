@@ -16,6 +16,8 @@ import type {
   DatasetFilterRule,
   DatasetOption,
   DatasetQueryKind,
+  DatasetRelationOptionsRequest,
+  DatasetRelationOptionState,
   DatasetSortRule,
   DatasetTableQuery,
 } from './types';
@@ -25,6 +27,7 @@ const props = defineProps<{
   fields: DatasetFieldDefinition[];
   query: DatasetTableQuery;
   relationOptions?: Record<string, DatasetOption[]>;
+  relationOptionStates?: Record<string, DatasetRelationOptionState>;
   active?: boolean;
   openRequestId?: number;
   requestedFieldId?: string;
@@ -32,6 +35,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   apply: [query: DatasetTableQuery];
+  relationOptionsRequest: [request: DatasetRelationOptionsRequest];
 }>();
 
 const open = shallowRef(false);
@@ -67,6 +71,28 @@ function createId(prefix: string): string {
 
 function getField(fieldId: string): DatasetFieldDefinition | undefined {
   return props.fields.find((field) => field.id === fieldId);
+}
+
+function selectedRelationIds(fieldId: string): string[] {
+  const rule = draft.value.filters.find((item) => item.fieldId === fieldId);
+  if (!rule) return [];
+  if (Array.isArray(rule.value)) return rule.value.map((item) => String(item));
+  if (typeof rule.value === 'string' && rule.value) return [rule.value];
+  return [];
+}
+
+function requestRelationOptions(fieldId: string, search = '', cursor?: string): void {
+  if (getField(fieldId)?.kind !== 'relation') return;
+  emit('relationOptionsRequest', {
+    fieldId,
+    search,
+    cursor,
+    selectedIds: selectedRelationIds(fieldId),
+  });
+}
+
+function relationOptionState(fieldId: string): DatasetRelationOptionState | undefined {
+  return props.relationOptionStates?.[fieldId];
 }
 
 function initialFilterValue(field: DatasetFieldDefinition | undefined): JsonValue {
@@ -108,11 +134,13 @@ function ensureInitialField(fieldId: string): void {
     next.group = { fieldId, aggregates: next.group?.aggregates ?? [] };
   }
   draft.value = next;
+  requestRelationOptions(fieldId);
 }
 
 watch(open, (isOpen) => {
   if (!isOpen) return;
   draft.value = cloneDatasetQuery(props.query);
+  draft.value.filters.forEach((rule) => requestRelationOptions(rule.fieldId));
   if (initialFieldId.value) {
     ensureInitialField(initialFieldId.value);
     initialFieldId.value = null;
@@ -163,6 +191,7 @@ function updateFilterField(index: number, fieldId: string): void {
     }
     : rule));
   draft.value = { ...draft.value, filters: nextFilters };
+  requestRelationOptions(fieldId);
 }
 
 function updateFilterOperator(index: number, operator: DatasetFilterRule['operator']): void {
@@ -463,15 +492,72 @@ function inputType(fieldId: string): string {
                 aria-label="筛选值"
                 @update:model-value="updateFilterValue(index, $event === 'true')"
               />
-              <USelect
-                v-else-if="isSelectField(rule.fieldId)"
-                :model-value="selectFilterValue(rule)"
-                :items="selectableItems(rule)"
-                value-key="value"
-                :multiple="isMultipleField(rule.fieldId)"
-                aria-label="筛选值"
-                @update:model-value="updateFilterValueFromUnknown(index, $event)"
-              />
+              <template v-else-if="isSelectField(rule.fieldId)">
+                <USelectMenu
+                  v-if="getField(rule.fieldId)?.kind === 'relation'"
+                  :model-value="selectFilterValue(rule)"
+                  :items="selectableItems(rule)"
+                  value-key="value"
+                  :multiple="isMultipleField(rule.fieldId)"
+                  :search-input="{ placeholder: '搜索关联数据' }"
+                  ignore-filter
+                  aria-label="筛选值"
+                  :loading="relationOptionState(rule.fieldId)?.status === 'loading'"
+                  @update:open="$event ? requestRelationOptions(rule.fieldId) : undefined"
+                  @update:search-term="requestRelationOptions(rule.fieldId, String($event))"
+                  @update:model-value="updateFilterValueFromUnknown(index, $event)"
+                >
+                  <template #empty>
+                    <span class="px-2 py-1 text-xs text-slate-500">
+                      {{ relationOptionState(rule.fieldId)?.status === 'loading'
+                        ? '正在加载…'
+                        : '没有匹配项' }}
+                    </span>
+                  </template>
+                  <template
+                    v-if="relationOptionState(rule.fieldId)?.nextCursor"
+                    #content-bottom
+                  >
+                    <UButton
+                      label="加载更多"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      block
+                      :loading="relationOptionState(rule.fieldId)?.status === 'loading'"
+                      @click.stop="requestRelationOptions(
+                        rule.fieldId,
+                        relationOptionState(rule.fieldId)?.search,
+                        relationOptionState(rule.fieldId)?.nextCursor ?? undefined,
+                      )"
+                    />
+                  </template>
+                </USelectMenu>
+                <USelect
+                  v-else
+                  :model-value="selectFilterValue(rule)"
+                  :items="selectableItems(rule)"
+                  value-key="value"
+                  :multiple="isMultipleField(rule.fieldId)"
+                  aria-label="筛选值"
+                  @update:model-value="updateFilterValueFromUnknown(index, $event)"
+                />
+                <div
+                  v-if="relationOptionState(rule.fieldId)?.status === 'error'"
+                  class="mt-2 flex items-center justify-between gap-2 text-xs text-error-600"
+                >
+                  <span class="truncate">
+                    {{ relationOptionState(rule.fieldId)?.error ?? '关联选项加载失败' }}
+                  </span>
+                  <UButton
+                    label="重试"
+                    color="error"
+                    variant="ghost"
+                    size="xs"
+                    @click="requestRelationOptions(rule.fieldId)"
+                  />
+                </div>
+              </template>
               <UInput
                 v-else
                 :model-value="filterInputValue(rule)"

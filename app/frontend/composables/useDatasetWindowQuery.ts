@@ -1,20 +1,23 @@
 import { useQueryClient } from '@tanstack/vue-query';
 import type {
   DatasetGroupSummary,
-  DatasetMetadataState,
   DatasetRowRange,
   DatasetTableQuery,
-  DatasetTableRow,
   DatasetWindowQueryRequest,
   DatasetWindowQueryResponse,
+  DatasetWindowQueryScope,
+} from '@orz-people-platform/types';
+import type {
+  DatasetMetadataState,
+  DatasetTableRow,
   DatasetWindowState,
 } from '~/components/dataset/types';
 import {
   DATASET_WINDOW_SIZE,
   getDatasetWindowOffsets,
   getDatasetWindowQueryKey,
+  replaceLoadedDatasetRow,
 } from '~/components/dataset/dataset-window';
-import type { DatasetWindowQueryScope } from '~/components/dataset/dataset-window';
 import {
   computed,
   shallowReadonly,
@@ -154,6 +157,25 @@ export function useDatasetWindowQuery(options: UseDatasetWindowQueryOptions) {
     )));
   }
 
+  function replaceRow(row: DatasetTableRow): boolean {
+    const nextSlots = replaceLoadedDatasetRow(rowSlots.value, row);
+    if (!nextSlots) return false;
+    rowSlots.value = nextSlots;
+    return true;
+  }
+
+  async function refreshRanges(ranges: readonly DatasetRowRange[]): Promise<void> {
+    const total = Math.max(totalRowCount.value, DATASET_WINDOW_SIZE);
+    const offsets = getDatasetWindowOffsets(ranges, total, false);
+    const scope = toValue(options.scope);
+    const canonicalQuery = toValue(options.canonicalQuery);
+    await Promise.all(offsets.map((offset) => queryClient.invalidateQueries({
+      queryKey: getDatasetWindowQueryKey(scope, canonicalQuery, offset),
+      exact: true,
+    })));
+    await requestRanges(ranges, true);
+  }
+
   async function reset(): Promise<void> {
     const scope = toValue(options.scope);
     const cancellation = queryClient.cancelQueries({
@@ -184,6 +206,8 @@ export function useDatasetWindowQuery(options: UseDatasetWindowQueryOptions) {
     groupDirectory: shallowReadonly(groupDirectory),
     metadataState: shallowReadonly(metadataState),
     windowStates: shallowReadonly(windowStates),
+    replaceRow,
+    refreshRanges,
     requestRanges,
     reset,
   };

@@ -14,7 +14,15 @@ import {
   Prisma,
 } from '@prisma/client';
 
-import type { AuthenticatedActor } from '@orz-people-platform/types';
+import type {
+  AuthenticatedActor,
+  DatasetCapabilities,
+  DatasetCreatorSummary,
+  DatasetDetailResponse,
+  DatasetFieldDefinition,
+  DatasetListResponse,
+  DatasetSummary,
+} from '@orz-people-platform/types';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,6 +30,7 @@ import { createDatasetDefinitionVersion } from './dataset-definition-version';
 import { DatasetSchemaService } from './dataset-schema.service';
 import type {
   AddDatasetCollaboratorInput,
+  ArchiveDatasetFieldInput,
   CreateDatasetFieldInput,
   CreateDatasetInput,
   UpdateDatasetFieldInput,
@@ -52,7 +61,7 @@ export class DatasetsService {
     this.assertWorkspace(workspaceId, actor);
     const elevated = this.hasGlobalRead(actor);
     const member = elevated ? null : await this.findActorMember(workspaceId, actor.userId);
-    return this.prisma.dataset.findMany({
+    const datasets = await this.prisma.dataset.findMany({
       where: {
         workspaceId,
         // 非特权用户仅列出自己为协作者的 Dataset。
@@ -60,22 +69,101 @@ export class DatasetsService {
           collaborators: { some: { workspaceMemberId: member?.id ?? '__missing__' } },
         }),
       },
-      include: { collaborators: true, fields: { orderBy: { position: 'asc' } } },
+      select: {
+        id: true,
+        workspaceId: true,
+        name: true,
+        slug: true,
+        description: true,
+        type: true,
+        status: true,
+        subjectMode: true,
+        revision: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true, name: true, nickname: true, username: true, avatarUrl: true,
+          },
+        },
+        collaborators: { select: { workspaceMemberId: true, role: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
+    const actorMember = member ?? await this.findActorMember(workspaceId, actor.userId);
+    return {
+      items: datasets.map((dataset) => ({
+        ...this.toSummary(dataset),
+        creator: this.toCreator(dataset.createdBy),
+        capabilities: this.capabilitiesFor(
+          dataset,
+          actor,
+          dataset.collaborators.find((item) => item.workspaceMemberId === actorMember?.id)?.role,
+        ),
+      })),
+      canCreate: this.canCreate(actor),
+    } satisfies DatasetListResponse;
   }
 
-  /** 获取单个 Dataset 详情，包含协作者和字段列表。 */
+  /** 获取单个 Dataset 的安全详情、活跃字段和服务端能力。 */
   public async get(workspaceId: number, datasetId: string, actor: AuthenticatedActor) {
     this.assertWorkspace(workspaceId, actor);
     await this.assertCanRead(workspaceId, datasetId, actor);
-    return this.prisma.dataset.findUniqueOrThrow({
+    const dataset = await this.prisma.dataset.findUniqueOrThrow({
       where: { workspaceId_id: { workspaceId, id: datasetId } },
-      include: {
-        collaborators: { include: { member: true } },
-        fields: { orderBy: { position: 'asc' } },
+      select: {
+        id: true,
+        workspaceId: true,
+        name: true,
+        slug: true,
+        description: true,
+        type: true,
+        status: true,
+        subjectMode: true,
+        revision: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true, name: true, nickname: true, username: true, avatarUrl: true,
+          },
+        },
+        collaborators: { select: { workspaceMemberId: true, role: true } },
+        fields: {
+          where: { archivedAt: null },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+          select: {
+            id: true,
+            datasetId: true,
+            key: true,
+            name: true,
+            description: true,
+            kind: true,
+            valueSchema: true,
+            config: true,
+            required: true,
+            isSystemManaged: true,
+            systemKey: true,
+            relationTargetDatasetId: true,
+            relationCardinality: true,
+            position: true,
+            revision: true,
+            archivedAt: true,
+          },
+        },
       },
     });
+    const actorMember = await this.findActorMember(workspaceId, actor.userId);
+    return {
+      dataset: this.toSummary(dataset),
+      fields: dataset.fields.map((field) => this.toField(field)),
+      creator: this.toCreator(dataset.createdBy),
+      capabilities: this.capabilitiesFor(
+        dataset,
+        actor,
+        dataset.collaborators.find((item) => item.workspaceMemberId === actorMember?.id)?.role,
+      ),
+    } satisfies DatasetDetailResponse;
   }
 
   /**
@@ -91,6 +179,7 @@ export class DatasetsService {
     actor: AuthenticatedActor,
   ) {
     this.assertWorkspace(workspaceId, actor);
+    if (!this.canCreate(actor)) throw new ForbiddenException('Dataset creation is not granted');
     if (dto.type === DatasetType.members || dto.type === DatasetType.activity_registrations) {
       throw new BadRequestException('This Dataset type is created only by its owning module');
     }
@@ -181,7 +270,9 @@ export class DatasetsService {
     dto: UpdateDatasetInput,
     actor: AuthenticatedActor,
   ) {
-    await this.assertCanManage(workspaceId, datasetId, actor);
+    const dataset = await this.assertCanManage(workspaceId, datasetId, actor);
+    this.assertTypeCapability(dataset.type, 'metadata');
+    this.assertActive(dataset.status);
     try {
       return await this.prisma.$transaction(async (tx) => {
         // updateMany + count 校验实现 CAS（compare-and-swap）乐观锁。
@@ -195,7 +286,7 @@ export class DatasetsService {
           },
         });
         if (result.count !== 1) throw new ConflictException('Dataset revision is stale');
-        const dataset = await tx.dataset.findUniqueOrThrow({ where: { id: datasetId } });
+        const updatedDataset = await tx.dataset.findUniqueOrThrow({ where: { id: datasetId } });
         await this.createDefinitionVersion(tx, datasetId, actor.userId, 'dataset.update');
         await this.audit.record({
           action: 'dataset.update',
@@ -205,9 +296,9 @@ export class DatasetsService {
           resourceId: datasetId,
           result: 'success',
           workspaceId,
-          metadata: { revision: dataset.revision },
+          metadata: { revision: updatedDataset.revision },
         }, tx);
-        return dataset;
+        return updatedDataset;
       });
     } catch (error) {
       return this.rethrowUniqueConflict(error, 'Dataset slug is already in use');
@@ -224,7 +315,9 @@ export class DatasetsService {
     expectedRevision: number,
     actor: AuthenticatedActor,
   ) {
-    await this.assertCanManage(workspaceId, datasetId, actor);
+    const managedDataset = await this.assertCanManage(workspaceId, datasetId, actor);
+    this.assertTypeCapability(managedDataset.type, 'archive');
+    this.assertActive(managedDataset.status);
     return this.prisma.$transaction(async (tx) => {
       const result = await tx.dataset.updateMany({
         where: {
@@ -362,11 +455,28 @@ export class DatasetsService {
   ) {
     const dataset = await this.assertCanManage(workspaceId, datasetId, actor);
     this.assertActive(dataset.status);
+    this.assertTypeCapability(dataset.type, 'fields');
     // 提前编译 value schema，失败时不碰数据库。
     const valueSchema = this.schemas.assertFieldSchema(dto.valueSchema);
     await this.assertRelationConfiguration(workspaceId, dto);
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const datasetResult = await tx.dataset.updateMany({
+          where: {
+            id: datasetId,
+            workspaceId,
+            revision: dto.expectedDatasetRevision,
+            status: DatasetStatus.active,
+          },
+          data: { revision: { increment: 1 } },
+        });
+        if (datasetResult.count !== 1) throw new ConflictException('Dataset revision is stale');
+        const activeFields = await tx.datasetField.findMany({
+          where: { datasetId, archivedAt: null },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        });
+        const position = Math.min(dto.position ?? activeFields.length, activeFields.length);
         const field = await tx.datasetField.create({
           data: {
             workspaceId,
@@ -380,14 +490,12 @@ export class DatasetsService {
             required: dto.required,
             relationTargetDatasetId: dto.relationTargetDatasetId,
             relationCardinality: dto.relationCardinality,
-            // 未指定位置时追加到末尾。
-            position: dto.position ?? await tx.datasetField.count({
-              where: { datasetId, archivedAt: null },
-            }),
+            position,
           },
         });
-        // 字段变更同时递增 Dataset 版本并创建定义快照。
-        await tx.dataset.update({ where: { id: datasetId }, data: { revision: { increment: 1 } } });
+        const orderedIds = activeFields.map((item) => item.id);
+        orderedIds.splice(position, 0, field.id);
+        await this.normalizeFieldPositions(tx, orderedIds);
         await this.createDefinitionVersion(tx, datasetId, actor.userId, 'dataset.field.create');
         await this.audit.record({
           action: 'dataset.field.create',
@@ -399,7 +507,10 @@ export class DatasetsService {
           workspaceId,
           metadata: { datasetId, kind: field.kind },
         }, tx);
-        return field;
+        return {
+          field: this.toField({ ...field, position }),
+          datasetRevision: dto.expectedDatasetRevision + 1,
+        };
       });
     } catch (error) {
       // P2002 = 唯一约束冲突 → key 重复。
@@ -420,11 +531,14 @@ export class DatasetsService {
   ) {
     const dataset = await this.assertCanManage(workspaceId, datasetId, actor);
     this.assertActive(dataset.status);
+    this.assertTypeCapability(dataset.type, 'fields');
     const field = await this.findField(workspaceId, datasetId, fieldId);
     // 系统字段（如 applicant_name、applicant_email）不可修改定义。
-    if (field.isSystemManaged
-      && (dto.key !== undefined || dto.valueSchema !== undefined
-        || dto.config !== undefined || dto.required !== undefined)) {
+    if (field.isSystemManaged && (
+      dto.valueSchema !== undefined
+      || dto.config !== undefined
+      || dto.required !== undefined
+    )) {
       throw new ConflictException('Protected system field definition cannot be changed');
     }
     const valueSchema = dto.valueSchema === undefined
@@ -432,24 +546,40 @@ export class DatasetsService {
       : this.schemas.assertFieldSchema(dto.valueSchema);
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const datasetResult = await tx.dataset.updateMany({
+          where: {
+            id: datasetId,
+            workspaceId,
+            revision: dto.expectedDatasetRevision,
+            status: DatasetStatus.active,
+          },
+          data: { revision: { increment: 1 } },
+        });
+        if (datasetResult.count !== 1) throw new ConflictException('Dataset revision is stale');
         const result = await tx.datasetField.updateMany({
           where: {
-            id: fieldId, workspaceId, datasetId, revision: dto.expectedRevision,
+            id: fieldId, workspaceId, datasetId, revision: dto.expectedFieldRevision,
           },
           data: {
-            key: dto.key,
             name: dto.name,
             description: dto.description,
             valueSchema,
             config: dto.config as Prisma.InputJsonObject | undefined,
             required: dto.required,
-            position: dto.position,
             revision: { increment: 1 },
           },
         });
         if (result.count !== 1) throw new ConflictException('Dataset field revision is stale');
+        const activeFields = await tx.datasetField.findMany({
+          where: { datasetId, archivedAt: null, id: { not: fieldId } },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        });
+        const orderedIds = activeFields.map((item) => item.id);
+        const position = Math.min(dto.position ?? field.position, orderedIds.length);
+        orderedIds.splice(position, 0, fieldId);
+        await this.normalizeFieldPositions(tx, orderedIds);
         const updated = await tx.datasetField.findUniqueOrThrow({ where: { id: fieldId } });
-        await tx.dataset.update({ where: { id: datasetId }, data: { revision: { increment: 1 } } });
         await this.createDefinitionVersion(tx, datasetId, actor.userId, 'dataset.field.update');
         await this.audit.record({
           action: 'dataset.field.update',
@@ -461,7 +591,10 @@ export class DatasetsService {
           workspaceId,
           metadata: { datasetId, revision: updated.revision },
         }, tx);
-        return updated;
+        return {
+          field: this.toField(updated),
+          datasetRevision: dto.expectedDatasetRevision + 1,
+        };
       });
     } catch (error) {
       return this.rethrowUniqueConflict(error, 'Dataset field key is already in use');
@@ -476,23 +609,43 @@ export class DatasetsService {
     workspaceId: number,
     datasetId: string,
     fieldId: string,
-    expectedRevision: number,
+    dto: ArchiveDatasetFieldInput,
     actor: AuthenticatedActor,
   ) {
     const dataset = await this.assertCanManage(workspaceId, datasetId, actor);
     this.assertActive(dataset.status);
+    this.assertTypeCapability(dataset.type, 'fields');
     const field = await this.findField(workspaceId, datasetId, fieldId);
     if (field.isSystemManaged) throw new ConflictException('Protected system fields cannot be archived');
     return this.prisma.$transaction(async (tx) => {
+      const datasetResult = await tx.dataset.updateMany({
+        where: {
+          id: datasetId,
+          workspaceId,
+          revision: dto.expectedDatasetRevision,
+          status: DatasetStatus.active,
+        },
+        data: { revision: { increment: 1 } },
+      });
+      if (datasetResult.count !== 1) throw new ConflictException('Dataset revision is stale');
       const result = await tx.datasetField.updateMany({
         where: {
-          id: fieldId, datasetId, workspaceId, revision: expectedRevision, archivedAt: null,
+          id: fieldId,
+          datasetId,
+          workspaceId,
+          revision: dto.expectedFieldRevision,
+          archivedAt: null,
         },
         data: { archivedAt: new Date(), revision: { increment: 1 } },
       });
       if (result.count !== 1) throw new ConflictException('Dataset field revision is stale or archived');
       const updated = await tx.datasetField.findUniqueOrThrow({ where: { id: fieldId } });
-      await tx.dataset.update({ where: { id: datasetId }, data: { revision: { increment: 1 } } });
+      const activeFields = await tx.datasetField.findMany({
+        where: { datasetId, archivedAt: null },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        select: { id: true },
+      });
+      await this.normalizeFieldPositions(tx, activeFields.map((item) => item.id));
       await this.createDefinitionVersion(tx, datasetId, actor.userId, 'dataset.field.archive');
       await this.audit.record({
         action: 'dataset.field.archive',
@@ -504,7 +657,10 @@ export class DatasetsService {
         workspaceId,
         metadata: { datasetId },
       }, tx);
-      return updated;
+      return {
+        field: this.toField(updated),
+        datasetRevision: dto.expectedDatasetRevision + 1,
+      };
     });
   }
 
@@ -555,6 +711,42 @@ export class DatasetsService {
     return dataset;
   }
 
+  /** 断言普通 HTTP 行创建符合 Dataset 类型策略。 */
+  public async assertCanCreateRows(
+    workspaceId: number,
+    datasetId: string,
+    actor: AuthenticatedActor,
+  ) {
+    const dataset = await this.assertCanManage(workspaceId, datasetId, actor);
+    this.assertActive(dataset.status);
+    this.assertTypeCapability(dataset.type, 'row_create');
+    return dataset;
+  }
+
+  /** 断言普通 HTTP 行更新符合 Dataset 类型策略。 */
+  public async assertCanUpdateRows(
+    workspaceId: number,
+    datasetId: string,
+    actor: AuthenticatedActor,
+  ) {
+    const dataset = await this.assertCanManage(workspaceId, datasetId, actor);
+    this.assertActive(dataset.status);
+    this.assertTypeCapability(dataset.type, 'row_update');
+    return dataset;
+  }
+
+  /** 断言普通 HTTP 行删除符合 Dataset 类型策略。 */
+  public async assertCanDeleteRows(
+    workspaceId: number,
+    datasetId: string,
+    actor: AuthenticatedActor,
+  ) {
+    const dataset = await this.assertCanManage(workspaceId, datasetId, actor);
+    this.assertActive(dataset.status);
+    this.assertTypeCapability(dataset.type, 'row_delete');
+    return dataset;
+  }
+
   /**
    * 创建不可变 DatasetVersion 快照，保存当前元数据及所有字段定义（含已归档字段）。
    * 版本号与 Dataset.revision 一致。必须在已有事务内调用。
@@ -566,6 +758,153 @@ export class DatasetsService {
     reason: string,
   ): Promise<void> {
     await createDatasetDefinitionVersion(tx, datasetId, actorUserId, reason);
+  }
+
+  private canCreate(actor: AuthenticatedActor): boolean {
+    return actor.isSystemAdmin
+      || actor.isWorkspaceAdmin
+      || actor.permissions.includes('dataset.create')
+      || actor.permissions.includes('dataset.manage_all');
+  }
+
+  private capabilitiesFor(
+    dataset: { status: DatasetStatus; type: DatasetType },
+    actor: AuthenticatedActor,
+    collaboratorRole?: DatasetCollaboratorRole,
+  ): DatasetCapabilities {
+    const canManage = actor.isSystemAdmin
+      || actor.isWorkspaceAdmin
+      || actor.permissions.includes('dataset.manage_all')
+      || collaboratorRole !== undefined;
+    const active = dataset.status === DatasetStatus.active;
+    if (!canManage || !active || dataset.type === DatasetType.activity_registrations) {
+      return this.emptyCapabilities();
+    }
+    if (dataset.type === DatasetType.members) {
+      return {
+        ...this.emptyCapabilities(),
+        canManageFields: true,
+        canUpdateRows: true,
+      };
+    }
+    if (dataset.type === DatasetType.join_requests) {
+      return {
+        ...this.emptyCapabilities(),
+        canUpdateMetadata: true,
+        canArchive: true,
+        canManageFields: true,
+      };
+    }
+    return {
+      canUpdateMetadata: true,
+      canArchive: true,
+      canManageFields: true,
+      canCreateRows: true,
+      canUpdateRows: true,
+      canDeleteRows: true,
+    };
+  }
+
+  private emptyCapabilities(): DatasetCapabilities {
+    return {
+      canUpdateMetadata: false,
+      canArchive: false,
+      canManageFields: false,
+      canCreateRows: false,
+      canUpdateRows: false,
+      canDeleteRows: false,
+    };
+  }
+
+  private assertTypeCapability(
+    type: DatasetType,
+    operation: 'archive' | 'fields' | 'metadata' | 'row_create' | 'row_delete' | 'row_update',
+  ): void {
+    const allowed = type === DatasetType.standard
+      || (type === DatasetType.members && (operation === 'fields' || operation === 'row_update'))
+      || (type === DatasetType.join_requests
+        && (operation === 'archive' || operation === 'fields' || operation === 'metadata'));
+    if (!allowed) throw new ForbiddenException(`Dataset type does not allow ${operation}`);
+  }
+
+  private toSummary(dataset: {
+    createdAt: Date;
+    description: string | null;
+    id: string;
+    name: string;
+    revision: number;
+    slug: string;
+    status: DatasetStatus;
+    subjectMode: 'none' | 'single_per_user';
+    type: DatasetType;
+    updatedAt: Date;
+    workspaceId: number;
+  }): DatasetSummary {
+    return {
+      id: dataset.id,
+      workspaceId: dataset.workspaceId,
+      name: dataset.name,
+      slug: dataset.slug,
+      description: dataset.description,
+      type: dataset.type,
+      status: dataset.status,
+      subjectMode: dataset.subjectMode,
+      revision: dataset.revision,
+      createdAt: dataset.createdAt.toISOString(),
+      updatedAt: dataset.updatedAt.toISOString(),
+    };
+  }
+
+  private toCreator(user: {
+    avatarUrl: string | null;
+    id: string;
+    name: string;
+    nickname: string;
+    username: string;
+  }): DatasetCreatorSummary {
+    return {
+      id: user.id,
+      displayName: user.nickname || user.name || user.username,
+      avatarUrl: user.avatarUrl,
+    };
+  }
+
+  private toField(field: {
+    archivedAt: Date | null;
+    config: Prisma.JsonValue;
+    datasetId: string;
+    description: string | null;
+    id: string;
+    isSystemManaged: boolean;
+    key: string;
+    kind: DatasetFieldKind;
+    name: string;
+    position: number;
+    relationCardinality: 'many' | 'one' | null;
+    relationTargetDatasetId: string | null;
+    required: boolean;
+    revision: number;
+    systemKey: string | null;
+    valueSchema: Prisma.JsonValue;
+  }): DatasetFieldDefinition {
+    return {
+      id: field.id,
+      datasetId: field.datasetId,
+      key: field.key,
+      name: field.name,
+      description: field.description,
+      kind: field.kind,
+      valueSchema: field.valueSchema as DatasetFieldDefinition['valueSchema'],
+      config: field.config as DatasetFieldDefinition['config'],
+      required: field.required,
+      isSystemManaged: field.isSystemManaged,
+      systemKey: field.systemKey,
+      relationTargetDatasetId: field.relationTargetDatasetId,
+      relationCardinality: field.relationCardinality,
+      position: field.position,
+      revision: field.revision,
+      archivedAt: field.archivedAt?.toISOString() ?? null,
+    };
   }
 
   /** 守卫操作者属于请求的 Workspace（当前仅支持 workspace 1）。 */
@@ -637,6 +976,17 @@ export class DatasetsService {
       },
     });
     if (otherOwners === 0) throw new ConflictException('An active Dataset must retain an owner');
+  }
+
+  /** 将给定活跃字段顺序持久化为从 0 开始的连续 position。 */
+  private async normalizeFieldPositions(
+    tx: Prisma.TransactionClient,
+    orderedIds: string[],
+  ): Promise<void> {
+    await Promise.all(orderedIds.map((id, position) => tx.datasetField.update({
+      where: { id },
+      data: { position },
+    })));
   }
 
   /**

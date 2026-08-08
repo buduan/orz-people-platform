@@ -5,6 +5,8 @@ import DatasetQueryPopover from './DatasetQueryPopover.vue';
 import type {
   DatasetOption,
   DatasetQueryOpenRequest,
+  DatasetRelationOptionsRequest,
+  DatasetRelationOptionState,
   DatasetTableQuery,
 } from './types';
 
@@ -12,13 +14,16 @@ const props = defineProps<{
   fields: DatasetFieldDefinition[];
   query: DatasetTableQuery;
   relationOptions?: Record<string, DatasetOption[]>;
+  relationOptionStates?: Record<string, DatasetRelationOptionState>;
   readonly?: boolean;
+  canCreateRows?: boolean;
   openRequest?: DatasetQueryOpenRequest | null;
 }>();
 
 const emit = defineEmits<{
   createRow: [];
   updateQuery: [query: DatasetTableQuery];
+  relationOptionsRequest: [request: DatasetRelationOptionsRequest];
 }>();
 
 const hasFilters = computed(() => props.query.filters.length > 0);
@@ -41,7 +46,7 @@ const hasGroup = computed(() => props.query.group !== null);
       variant="ghost"
       size="sm"
       class="rounded-md text-slate-700 hover:bg-slate-200"
-      :disabled="readonly"
+      :disabled="readonly || canCreateRows === false"
       @click="emit('createRow')"
     />
     <DatasetQueryPopover
@@ -49,30 +54,36 @@ const hasGroup = computed(() => props.query.group !== null);
       :fields="fields"
       :query="query"
       :relation-options="relationOptions"
+      :relation-option-states="relationOptionStates"
       :active="hasFilters"
       :open-request-id="openRequest?.kind === 'filter' ? openRequest.id : undefined"
       :requested-field-id="openRequest?.kind === 'filter' ? openRequest.fieldId : undefined"
       @apply="emit('updateQuery', $event)"
+      @relation-options-request="emit('relationOptionsRequest', $event)"
     />
     <DatasetQueryPopover
       kind="sort"
       :fields="fields"
       :query="query"
       :relation-options="relationOptions"
+      :relation-option-states="relationOptionStates"
       :active="hasSorts"
       :open-request-id="openRequest?.kind === 'sort' ? openRequest.id : undefined"
       :requested-field-id="openRequest?.kind === 'sort' ? openRequest.fieldId : undefined"
       @apply="emit('updateQuery', $event)"
+      @relation-options-request="emit('relationOptionsRequest', $event)"
     />
     <DatasetQueryPopover
       kind="group"
       :fields="fields"
       :query="query"
       :relation-options="relationOptions"
+      :relation-option-states="relationOptionStates"
       :active="hasGroup"
       :open-request-id="openRequest?.kind === 'group' ? openRequest.id : undefined"
       :requested-field-id="openRequest?.kind === 'group' ? openRequest.fieldId : undefined"
       @apply="emit('updateQuery', $event)"
+      @relation-options-request="emit('relationOptionsRequest', $event)"
     />
     <UButton
       icon="i-solar-clipboard-list-bold-duotone"

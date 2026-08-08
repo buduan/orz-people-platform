@@ -22,8 +22,12 @@ withDefaults(defineProps<DatasetTableProps>(), {
   selection: () => ({ mode: 'explicit', rowIds: [] }),
   locks: () => [],
   relationOptions: () => ({}),
+  relationOptionStates: () => ({}),
   rowActions: () => [],
   readonlyCellKeys: () => [],
+  readonlyFieldIds: () => [],
+  canManageFields: false,
+  canCreateRows: true,
   readonly: false,
 });
 
@@ -69,10 +73,13 @@ function emitCellCommit(payload: DatasetCellCoordinates & {
       :fields="fields"
       :query="query"
       :relation-options="relationOptions"
+      :relation-option-states="relationOptionStates"
       :readonly="readonly"
+      :can-create-rows="canCreateRows"
       :open-request="queryOpenRequest"
       @create-row="emit('row-create-request')"
       @update-query="emit('query-change', $event)"
+      @relation-options-request="emit('relation-options-request', $event)"
     />
     <DatasetGrid
       :fields="fields"
@@ -88,8 +95,11 @@ function emitCellCommit(payload: DatasetCellCoordinates & {
       :selection="selection"
       :locks="locks"
       :relation-options="relationOptions"
+      :relation-option-states="relationOptionStates"
       :row-actions="rowActions"
       :readonly-cell-keys="readonlyCellKeys"
+      :readonly-field-ids="readonlyFieldIds"
+      :can-manage-fields="canManageFields"
       :readonly="readonly"
       @selection-change="emit('selection-change', $event)"
       @field-action="handleFieldAction"
@@ -100,6 +110,7 @@ function emitCellCommit(payload: DatasetCellCoordinates & {
       @toggle-group="emit('toggle-group', $event)"
       @window-range-request="emit('window-range-request', $event)"
       @visible-range-change="emit('visible-range-change', $event)"
+      @relation-options-request="emit('relation-options-request', $event)"
     />
   </section>
 </template>
