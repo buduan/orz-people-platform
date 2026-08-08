@@ -191,7 +191,7 @@ export class DatasetsService {
     const owner = member ?? await this.findWorkspaceOwnerMember(workspaceId);
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const transactionResult = await this.prisma.$transaction(async (tx) => {
         const dataset = await tx.dataset.create({
           data: {
             workspaceId,
@@ -254,6 +254,7 @@ export class DatasetsService {
         }, tx);
         return dataset;
       });
+      return transactionResult;
     } catch (error) {
       // P2002 = 唯一约束冲突 → slug 重复。
       return this.rethrowUniqueConflict(error, 'Dataset slug is already in use');
@@ -274,7 +275,7 @@ export class DatasetsService {
     this.assertTypeCapability(dataset.type, 'metadata');
     this.assertActive(dataset.status);
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const transactionResult = await this.prisma.$transaction(async (tx) => {
         // updateMany + count 校验实现 CAS（compare-and-swap）乐观锁。
         const result = await tx.dataset.updateMany({
           where: { id: datasetId, workspaceId, revision: dto.expectedRevision },
@@ -300,6 +301,7 @@ export class DatasetsService {
         }, tx);
         return updatedDataset;
       });
+      return transactionResult;
     } catch (error) {
       return this.rethrowUniqueConflict(error, 'Dataset slug is already in use');
     }
@@ -460,7 +462,7 @@ export class DatasetsService {
     const valueSchema = this.schemas.assertFieldSchema(dto.valueSchema);
     await this.assertRelationConfiguration(workspaceId, dto);
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const transactionResult = await this.prisma.$transaction(async (tx) => {
         const datasetResult = await tx.dataset.updateMany({
           where: {
             id: datasetId,
@@ -512,6 +514,7 @@ export class DatasetsService {
           datasetRevision: dto.expectedDatasetRevision + 1,
         };
       });
+      return transactionResult;
     } catch (error) {
       // P2002 = 唯一约束冲突 → key 重复。
       return this.rethrowUniqueConflict(error, 'Dataset field key is already in use');
@@ -545,7 +548,7 @@ export class DatasetsService {
       ? undefined
       : this.schemas.assertFieldSchema(dto.valueSchema);
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const transactionResult = await this.prisma.$transaction(async (tx) => {
         const datasetResult = await tx.dataset.updateMany({
           where: {
             id: datasetId,
@@ -596,6 +599,7 @@ export class DatasetsService {
           datasetRevision: dto.expectedDatasetRevision + 1,
         };
       });
+      return transactionResult;
     } catch (error) {
       return this.rethrowUniqueConflict(error, 'Dataset field key is already in use');
     }

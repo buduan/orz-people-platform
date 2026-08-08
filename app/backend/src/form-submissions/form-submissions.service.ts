@@ -340,7 +340,7 @@ export class FormSubmissionsService {
 
     try {
       // Serializable 隔离级别防止并发幂等写入冲突。
-      return await this.prisma.$transaction(async (tx) => {
+      const transactionResult = await this.prisma.$transaction(async (tx) => {
         // ---- 事务内二次幂等检查 ----
         const concurrent = await this.checkIdempotent(tx, form.id, idempotencyKey, payloadChecksum);
         if (concurrent) return concurrent;
@@ -397,6 +397,7 @@ export class FormSubmissionsService {
         }, tx);
         return this.submissionResult(submission);
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return transactionResult;
     } catch (error) {
       // P2002 / P2034 = 并发写入冲突；在事务外再次尝试幂等匹配。
       if (error instanceof Prisma.PrismaClientKnownRequestError

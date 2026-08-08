@@ -117,7 +117,7 @@ export class UsersService {
     username: string;
   }): Promise<{ id: string; tokenVersion: number }> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const transactionResult = await this.prisma.$transaction(async (tx) => {
         const now = new Date();
         const created = await tx.user.create({
           data: {
@@ -175,6 +175,7 @@ export class UsersService {
         }, tx);
         return created;
       });
+      return transactionResult;
     } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const target = Array.isArray(error.meta?.target) ? error.meta.target : [];

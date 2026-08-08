@@ -94,7 +94,7 @@ export class JoinRequestsService {
 
     try {
       // Serializable 隔离级别防止并发创建重复申请行。
-      return await this.prisma.$transaction(async (tx) => {
+      const transactionResult = await this.prisma.$transaction(async (tx) => {
         const subject = await tx.datasetRowSubject.findUnique({
           where: { datasetId_userId: { datasetId, userId: actor.userId } },
           include: { row: { include: { joinRequest: true } } },
@@ -120,6 +120,7 @@ export class JoinRequestsService {
         }
         return this.createRequest(tx, workspaceId, datasetId, values, validated.relations, actor);
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return transactionResult;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
         throw new ConflictException('Join Request changed concurrently');

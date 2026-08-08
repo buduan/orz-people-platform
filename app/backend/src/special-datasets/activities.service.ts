@@ -74,7 +74,7 @@ export class ActivitiesService {
     if (!member) throw new ForbiddenException('A Workspace member is required to own an Activity');
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const transactionResult = await this.prisma.$transaction(async (tx) => {
         // 先创建绑定的报名 Dataset。
         const dataset = await tx.dataset.create({
           data: {
@@ -125,6 +125,7 @@ export class ActivitiesService {
         }, tx);
         return activity;
       });
+      return transactionResult;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('Activity or registration Dataset slug is already in use');
